@@ -1,0 +1,262 @@
+package com.eka.voice2rx_sdk
+
+import android.app.Application
+import android.util.Log
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.eka.voice2rx_sdk.common.Voice2RxUtils
+import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
+import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
+import com.eka.voice2rx_sdk.data.local.models.EndOfFileMessage
+import com.eka.voice2rx_sdk.data.local.models.FileInfo
+import com.eka.voice2rx_sdk.data.local.models.RecordingState
+import com.eka.voice2rx_sdk.data.local.models.StartOfMessage
+import com.eka.voice2rx_sdk.data.local.models.Voice2RxType
+import com.eka.voice2rx_sdk.recorder.AudioCallback
+import com.eka.voice2rx_sdk.recorder.VoiceRecorder
+import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
+import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
+import com.eka.voice2rx_sdk.data.repositories.VToRxRepository
+import com.google.gson.Gson
+import com.konovalov.vad.silero.Vad
+import com.konovalov.vad.silero.VadSilero
+import com.konovalov.vad.silero.config.FrameSize
+import com.konovalov.vad.silero.config.Mode
+import com.konovalov.vad.silero.config.SampleRate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.io.File
+import java.util.ArrayList
+import java.util.UUID
+
+class V2RxViewModel(
+    val app: Application,
+) : AndroidViewModel(app), AudioCallback {
+
+    companion object {
+        const val TAG = "VADViewModel"
+        val bucketName = Voice2RxInit.getVoice2RxInitConfiguration().s3Config.bucketName
+        val folderName: String = Voice2RxUtils.getCurrentDateInYYMMDD()
+        val config = Voice2RxInit.getVoice2RxInitConfiguration()
+//        var chunksInfo : Map<String,FileInfo> = mutableMapOf()
+    }
+    var database: Voice2RxDatabase
+    var repository : VToRxRepository
+    init {
+        database = Voice2RxDatabase.getDatabase(app)
+        repository = VToRxRepository(database)
+    }
+
+    private val DEFAULT_MODE = Mode.NORMAL
+    private val DEFAULT_SILENCE_DURATION_MS = 300
+
+    private val audioChunks = mutableListOf<ShortArray>()
+
+    private var chunksInfo = mutableMapOf<String, FileInfo>()
+    private var recordedFiles = ArrayList<String>()
+
+    val sessionId = mutableStateOf(Voice2RxUtils.generateNewSessionId())
+
+    private lateinit var recorder: VoiceRecorder
+    private lateinit var audioHelper: AudioHelper
+    private lateinit var uploadService: UploadService
+    private lateinit var vad: VadSilero
+    private var isRecording = false
+
+    private val _recordingResponse = MutableStateFlow<String>("Analyzing...")
+    val recordingResponse = _recordingResponse.asStateFlow()
+
+    private val _recordingState = MutableStateFlow<RecordingState>(RecordingState.INITIAL)
+    val recordingState = _recordingState.asStateFlow()
+
+    private val _sessionsByOwnerId = MutableStateFlow<List<VToRxSession>>(emptyList())
+    val sessionsByOwnerId = _sessionsByOwnerId.asStateFlow()
+
+    private val FULL_RECORDING_FILE_NAME =
+        UUID.randomUUID().toString() + "_" + "Full_Recording.m4a_"
+
+    private lateinit var fullRecordingFile: File
+
+    fun addValueToChunksInfo(fileName: String, fileInfo: FileInfo) {
+        chunksInfo[fileName.split("_").last()] = fileInfo
+        recordedFiles.add(fileName)
+    }
+
+    fun getUploadService(): UploadService {
+        return uploadService
+    }
+
+    fun startRecording(mode : Voice2RxType) {
+        viewModelScope.launch {
+            sessionId.value = Voice2RxInit.getVoice2RxInitConfiguration().sessionId
+
+            vad = Vad.builder()
+                .setContext(app)
+                .setSampleRate(SampleRate.SAMPLE_RATE_16K)
+                .setFrameSize(FrameSize.FRAME_SIZE_512)
+                .setMode(DEFAULT_MODE)
+                .setSilenceDurationMs(DEFAULT_SILENCE_DURATION_MS)
+                .build()
+
+            recorder = VoiceRecorder(this@V2RxViewModel)
+            audioHelper = AudioHelper(app, this@V2RxViewModel, sessionId.value)
+            uploadService = UploadService(app, audioHelper, sessionId.value)
+            uploadService.FILE_INDEX = 0
+
+            isRecording = true
+            fullRecordingFile = File(app.filesDir, FULL_RECORDING_FILE_NAME)
+            chunksInfo = mutableMapOf<String, FileInfo>()
+            recorder.start(app, fullRecordingFile, vad.sampleRate.value, vad.frameSize.value)
+            Log.d(TAG, "Recording started")
+            Log.d(TAG, "FolderName : $folderName" + " SessionId : $sessionId")
+            sendStartOfMessage(mode = mode)
+            config.onStart.invoke(sessionId.value)
+        }
+        _recordingState.value = RecordingState.STARTED
+    }
+
+    private fun sendStartOfMessage(mode : Voice2RxType) {
+        val s3Url = "s3://$bucketName/$folderName/${sessionId.value}/"
+        val som = StartOfMessage(
+            contextData = Voice2RxInit.getVoice2RxInitConfiguration().contextData,
+            date = Voice2RxUtils.convertTimestampToISO8601(System.currentTimeMillis()),
+            docOid = Voice2RxInit.getVoice2RxInitConfiguration().docOid,
+            docUuid = Voice2RxInit.getVoice2RxInitConfiguration().docUuid,
+            files = listOf(),
+            mode = mode.value,
+            s3Url = s3Url,
+            uuid = sessionId.value
+        )
+        Log.d(TAG, "SOM : " + Gson().toJson(som))
+        val somFile = saveJsonToFile("som.json", Gson().toJson(som))
+        AwsS3UploadService.uploadFileToS3(app, "som.json", somFile, folderName, sessionId.value, isAudio = false)
+    }
+
+    fun saveJsonToFile(fileName: String, jsonContent: String): File {
+        val file = File(app.filesDir, fileName)
+        file.writeText(jsonContent)
+        return file
+    }
+
+    fun stopRecording(mode : Voice2RxType) {
+        viewModelScope.launch {
+            isRecording = false
+            recorder.stop()
+            audioHelper.uploadLastData()
+            uploadWholeFileData()
+            sendEndOfMessage()
+            storeSessionInDatabase(mode)
+            config.onStop.invoke(sessionId.value)
+        }
+        _recordingState.value = RecordingState.INITIAL
+    }
+
+    private fun storeSessionInDatabase(mode : Voice2RxType) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.insertSession(
+                session = VToRxSession(
+                    sessionId = sessionId.value,
+                    filePaths = recordedFiles.toList(),
+                    createdAt = System.currentTimeMillis(),
+                    fullAudioPath = FULL_RECORDING_FILE_NAME,
+                    ownerId = Voice2RxInit.getVoice2RxInitConfiguration().ownerId,
+                    callerId = Voice2RxInit.getVoice2RxInitConfiguration().callerId,
+                    patientId = Voice2RxInit.getVoice2RxInitConfiguration().contextData.patient?.id.toString(),
+                    mode = mode
+                )
+            )
+        }
+    }
+
+    fun getSessionsByOwnerId(ownerId : String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _sessionsByOwnerId.value = repository.getSessionsByOwnerId(
+                ownerId = ownerId,
+            )
+        }
+    }
+
+    private fun sendEndOfMessage() {
+        val s3Url = "s3://$bucketName/$folderName/${sessionId.value}/"
+        val files = mutableListOf<String>()
+        chunksInfo.forEach { entry ->
+            files.add(entry.key)
+        }
+        val eof = EndOfFileMessage(
+            contextData = Voice2RxInit.getVoice2RxInitConfiguration().contextData,
+            date = Voice2RxUtils.convertTimestampToISO8601(System.currentTimeMillis()),
+            docOid = Voice2RxInit.getVoice2RxInitConfiguration().docOid,
+            docUuid = Voice2RxInit.getVoice2RxInitConfiguration().docUuid,
+            files = files,
+            s3Url = s3Url,
+            uuid = sessionId.value,
+            chunksInfo = chunksInfo
+        )
+        Log.d(TAG, "EOF : " + Gson().toJson(eof))
+        val eofFile = saveJsonToFile("eof.json", Gson().toJson(eof))
+        AwsS3UploadService.uploadFileToS3(app, "eof.json", eofFile, folderName, sessionId.value, isAudio = false)
+    }
+
+    private fun uploadWholeFileData() {
+        if (fullRecordingFile != null) {
+            AwsS3UploadService.uploadFileToS3(
+                app,
+                "full_audio.m4a_",
+                fullRecordingFile,
+                folderName,
+                sessionId.value
+            )
+        }
+    }
+
+    override fun onAudio(audioData: ShortArray, timeStamp: Long) {
+//        Log.d("ProcessVoice","onAudio")
+        audioChunks.add(audioData)
+        if (audioChunks.size > 300) {
+            audioChunks.removeFirst()
+        }
+        var isSpeech = false
+        if (audioData.size == 512) {
+            isSpeech = vad.isSpeech(audioData)
+        }
+
+        if (isSpeech) {
+            _recordingResponse.value = "speech detected!"
+        } else {
+            _recordingResponse.value = "no speech detected!"
+        }
+
+        audioHelper.process(
+            AudioRecordModel(
+                frameData = audioData,
+                isClipped = false,
+                isSilence = !isSpeech,
+                timeStamp = timeStamp
+            )
+        )
+    }
+
+    fun getCombinedAudio(): ShortArray {
+        Log.d("ViewModel", "AudioChunks size : " + audioChunks.size.toString())
+        val totalSize = audioChunks.sumOf { it.size }
+        val combinedAudio = ShortArray(totalSize)
+        var currentIndex = 0
+
+
+        for (chunk in audioChunks) {
+            chunk.copyInto(combinedAudio, currentIndex)
+            currentIndex += chunk.size
+        }
+
+        return combinedAudio
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        recorder.stop()
+        vad.close()
+    }
+}
