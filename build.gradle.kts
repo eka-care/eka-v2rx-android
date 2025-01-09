@@ -1,6 +1,8 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("maven-publish")
+    id("kotlin-kapt")
 }
 
 android {
@@ -44,33 +46,52 @@ android {
             )
         }
     }
-    kotlin {
-        jvmToolchain(17)
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.4.3"
     }
+
     buildFeatures {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
+
+                groupId = "com.eka.voice2rx"
+                artifactId = "voice2rx"
+                version = "0.0.1"
+            }
+        }
     }
 }
 
 dependencies {
-
-//    implementation(libs.androidx.core.ktx)
-//    implementation(libs.androidx.appcompat)
-//    implementation(libs.android.material)
-//    testImplementation(libs.junit)
-//    androidTestImplementation(libs.ext.junit)
-//    androidTestImplementation(libs.espresso.core)
-    implementation(project(":network"))
-    implementation(project(":user"))
-    implementation(project(":sketch"))
-    implementation(project(":base"))
-    api(libs.androidx.activity.compose)
-    api(platform(libs.androidx.compose.bom))
-    implementation(libs.silero)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.core.ktx)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.navigation.compose)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.ext.junit)
+    implementation(libs.androidx.compose.material3)
+    api(libs.silero)
     implementation(libs.aws.android.sdk.s3)
     implementation(libs.aws.android.sdk.core)
+    kapt(libs.room.compiler)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
 }
