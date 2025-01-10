@@ -1,12 +1,16 @@
 package com.eka.voice2rx_sdk.common
 
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
 
 object Voice2RxUtils {
+    fun getCurrentUTCEpochMillis(): Long {
+        return Calendar.getInstance(TimeZone.getTimeZone("UTC")).timeInMillis
+    }
     fun getCurrentDateInYYMMDD(): String {
         val date = Date()
         val formatter = SimpleDateFormat("yyMMdd", Locale.getDefault())

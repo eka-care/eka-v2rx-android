@@ -8,7 +8,7 @@ import com.eka.voice2rx_sdk.common.DatabaseConstants
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxType
 
 @Keep
-@Entity(tableName = DatabaseConstants.V2RX_SESSION_TABLE_NAME, primaryKeys = ["session_id"])
+@Entity(tableName = DatabaseConstants.V2RX_SESSION_TABLE_NAME)
 data class VToRxSession(
     @PrimaryKey
     @ColumnInfo(name = "session_id") val sessionId : String,

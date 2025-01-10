@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.eka.voice2rx"
+    namespace = "com.eka.voice2rx_sdk"
     compileSdk = 34
     buildToolsVersion = "30.0.3"
 

@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.amazonaws.services.s3.model.S3DataSource.Utils
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
@@ -18,6 +19,7 @@ import com.eka.voice2rx_sdk.recorder.VoiceRecorder
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
 import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
 import com.eka.voice2rx_sdk.data.repositories.VToRxRepository
+import com.eka.voice2rx_sdk.sdkinit.Voice2RxInitConfig
 import com.google.gson.Gson
 import com.konovalov.vad.silero.Vad
 import com.konovalov.vad.silero.VadSilero
@@ -38,9 +40,6 @@ class V2RxViewModel(
 
     companion object {
         const val TAG = "VADViewModel"
-        val bucketName = Voice2RxInit.getVoice2RxInitConfiguration().s3Config.bucketName
-        val folderName: String = Voice2RxUtils.getCurrentDateInYYMMDD()
-        val config = Voice2RxInit.getVoice2RxInitConfiguration()
 //        var chunksInfo : Map<String,FileInfo> = mutableMapOf()
     }
     var database: Voice2RxDatabase
@@ -49,6 +48,10 @@ class V2RxViewModel(
         database = Voice2RxDatabase.getDatabase(app)
         repository = VToRxRepository(database)
     }
+
+    var bucketName = ""
+    var folderName: String = ""
+    lateinit var config : Voice2RxInitConfig
 
     private val DEFAULT_MODE = Mode.NORMAL
     private val DEFAULT_SILENCE_DURATION_MS = 300
@@ -79,6 +82,12 @@ class V2RxViewModel(
         UUID.randomUUID().toString() + "_" + "Full_Recording.m4a_"
 
     private lateinit var fullRecordingFile: File
+
+    fun initValues() {
+        bucketName = Voice2RxInit.getVoice2RxInitConfiguration().s3Config.bucketName
+        folderName = Voice2RxUtils.getCurrentDateInYYMMDD()
+        config = Voice2RxInit.getVoice2RxInitConfiguration()
+    }
 
     fun addValueToChunksInfo(fileName: String, fileInfo: FileInfo) {
         chunksInfo[fileName.split("_").last()] = fileInfo
@@ -154,13 +163,20 @@ class V2RxViewModel(
         _recordingState.value = RecordingState.INITIAL
     }
 
+    fun dispose() {
+        viewModelScope.launch {
+            isRecording = false
+            recorder.stop()
+        }
+    }
+
     private fun storeSessionInDatabase(mode : Voice2RxType) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.insertSession(
                 session = VToRxSession(
                     sessionId = sessionId.value,
                     filePaths = recordedFiles.toList(),
-                    createdAt = System.currentTimeMillis(),
+                    createdAt = Voice2RxUtils.getCurrentUTCEpochMillis(),
                     fullAudioPath = FULL_RECORDING_FILE_NAME,
                     ownerId = Voice2RxInit.getVoice2RxInitConfiguration().ownerId,
                     callerId = Voice2RxInit.getVoice2RxInitConfiguration().callerId,
