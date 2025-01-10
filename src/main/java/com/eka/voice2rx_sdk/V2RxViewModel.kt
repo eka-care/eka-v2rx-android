@@ -40,7 +40,6 @@ class V2RxViewModel(
 
     companion object {
         const val TAG = "VADViewModel"
-//        var chunksInfo : Map<String,FileInfo> = mutableMapOf()
     }
     var database: Voice2RxDatabase
     var repository : VToRxRepository
@@ -153,7 +152,9 @@ class V2RxViewModel(
     fun stopRecording(mode : Voice2RxType) {
         viewModelScope.launch {
             isRecording = false
-            recorder.stop()
+            if (::recorder.isInitialized) {
+                recorder.stop()
+            }
             audioHelper.uploadLastData()
             uploadWholeFileData()
             sendEndOfMessage()
@@ -166,7 +167,9 @@ class V2RxViewModel(
     fun dispose() {
         viewModelScope.launch {
             isRecording = false
-            recorder.stop()
+            if (::recorder.isInitialized) {
+                recorder.stop()
+            }
         }
     }
 
@@ -272,7 +275,11 @@ class V2RxViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        recorder.stop()
-        vad.close()
+        if (::recorder.isInitialized) {
+            recorder.stop()
+        }
+        if (::vad.isInitialized) {
+            vad.close()
+        }
     }
 }
