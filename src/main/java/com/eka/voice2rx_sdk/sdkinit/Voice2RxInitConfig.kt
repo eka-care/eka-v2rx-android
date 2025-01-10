@@ -18,5 +18,5 @@ data class Voice2RxInitConfig(
     val despCutDuration: Int,
     val maxCutDuration: Int,
     val sessionId : String,
-    val voice2RxScreen: @Composable (onStart: () -> Unit, onStop: () -> Unit) -> Unit
+//    val voice2RxScreen: @Composable (onStart: () -> Unit, onStop: () -> Unit) -> Unit
 )

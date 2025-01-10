@@ -2,6 +2,7 @@ package com.eka.voice2rx_sdk
 
 import android.content.Context
 import android.util.Log
+import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -91,7 +92,7 @@ class UploadService(
             outputFile = outputFile,
             audioData,
             Voice2RxInit.getVoice2RxInitConfiguration().sampleRate,
-            V2RxViewModel.folderName,
+            Voice2RxUtils.getCurrentDateInYYMMDD(),
             sessionId
         )
     }

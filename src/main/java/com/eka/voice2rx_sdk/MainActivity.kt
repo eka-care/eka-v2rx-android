@@ -21,9 +21,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.eka.voice2rx_sdk.data.local.models.RecordingState
-import com.eka.voice2rx_sdk.screens.CustomButton
-import com.eka.voice2rx_sdk.screens.Voice2RxModeSelection
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInitConfig
 import com.eka.voice2rx_sdk.ui.theme.VADSampleProjectTheme
@@ -56,10 +53,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("mode_selection") {
-                            Voice2RxModeSelection { selectedMode ->
-                                mode = selectedMode
-                                navController.navigate("greeting")
-                            }
                         }
                     }
                 }
@@ -85,17 +78,5 @@ fun Greeting(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        when(recordingState) {
-            RecordingState.INITIAL -> {
-                CustomButton(text = "Start Recording") {
-                    viewModel.startRecording(mode)
-                }
-            }
-            RecordingState.STARTED -> {
-                CustomButton(text = "Stop Recording") {
-                    viewModel.stopRecording(mode)
-                }
-            }
-        }
     }
 }

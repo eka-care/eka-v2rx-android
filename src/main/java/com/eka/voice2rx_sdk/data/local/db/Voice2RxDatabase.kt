@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import com.eka.voice2rx_sdk.data.local.convertors.Convertor
 import com.eka.voice2rx_sdk.data.local.db.daos.VToRxSessionDao
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 
@@ -14,6 +16,7 @@ import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
     version = 1,
     exportSchema = false
 )
+@TypeConverters(Convertor::class)
 abstract class Voice2RxDatabase : RoomDatabase() {
     abstract fun getVoice2RxDao(): VToRxSessionDao
     companion object {
