@@ -28,7 +28,8 @@ class AwsS3UploadService {
             file: File,
             folderName: String,
             sessionId: String,
-            isAudio : Boolean = true
+            isAudio : Boolean = true,
+            isFullAudio : Boolean = false,
         ) {
             TransferNetworkLossHandler.getInstance(context.applicationContext)
             val voice2RxInitConfig = Voice2RxInit.getVoice2RxInitConfiguration()
@@ -63,13 +64,13 @@ class AwsS3UploadService {
 
                     when(state) {
                         TransferState.COMPLETED -> {
-                            deleteFile(file)
+                            deleteFile(file,isFullAudio)
                         }
                         TransferState.FAILED -> {
-                            deleteFile(file)
+                            deleteFile(file,isFullAudio)
                         }
                         TransferState.CANCELED -> {
-                            deleteFile(file)
+                            deleteFile(file,isFullAudio)
                         }
                         else -> {
 
@@ -88,7 +89,10 @@ class AwsS3UploadService {
             })
         }
 
-        fun deleteFile(file: File) {
+        fun deleteFile(file: File, isFullAudio: Boolean) {
+            if(isFullAudio){
+                return
+            }
             CoroutineScope(Dispatchers.IO).launch {
                 if (file.exists()) {
                     try {

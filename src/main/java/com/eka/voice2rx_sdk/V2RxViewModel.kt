@@ -226,7 +226,8 @@ class V2RxViewModel(
                 "full_audio.m4a_",
                 fullRecordingFile,
                 folderName,
-                sessionId.value
+                sessionId.value,
+                isFullAudio = true
             )
         }
     }
