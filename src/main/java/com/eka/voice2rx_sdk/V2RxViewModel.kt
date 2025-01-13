@@ -118,8 +118,6 @@ class V2RxViewModel(
             fullRecordingFile = File(app.filesDir, FULL_RECORDING_FILE_NAME)
             chunksInfo = mutableMapOf<String, FileInfo>()
             recorder.start(app, fullRecordingFile, vad.sampleRate.value, vad.frameSize.value)
-            Log.d(TAG, "Recording started")
-            Log.d(TAG, "FolderName : $folderName" + " SessionId : $sessionId")
             sendStartOfMessage(mode = mode)
             config.onStart.invoke(sessionId.value)
         }
@@ -159,7 +157,7 @@ class V2RxViewModel(
             uploadWholeFileData()
             sendEndOfMessage()
             storeSessionInDatabase(mode)
-            config.onStop.invoke(sessionId.value)
+            config.onStop.invoke(sessionId.value, chunksInfo.size + 2)
         }
         _recordingState.value = RecordingState.INITIAL
     }
