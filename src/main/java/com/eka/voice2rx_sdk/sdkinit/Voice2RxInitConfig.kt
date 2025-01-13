@@ -5,7 +5,7 @@ import com.eka.voice2rx_sdk.data.local.models.ContextData
 
 data class Voice2RxInitConfig(
     val onStart: (sessionId: String) -> Unit,
-    val onStop: (sessionId: String) -> Unit,
+    val onStop: (sessionId: String, recordedFiles : Int) -> Unit,
     val s3Config: AwsS3Configuration,
     val docOid: String,
     val docUuid: String,
@@ -18,5 +18,4 @@ data class Voice2RxInitConfig(
     val despCutDuration: Int,
     val maxCutDuration: Int,
     val sessionId : String,
-//    val voice2RxScreen: @Composable (onStart: () -> Unit, onStop: () -> Unit) -> Unit
 )
