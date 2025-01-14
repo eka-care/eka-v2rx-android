@@ -1,5 +1,7 @@
 package com.eka.voice2rx_sdk.audio_converters
 
+import androidx.annotation.Keep
+
 class ConversionResult {
     val convertCode: ConversionCode
     var errorMessage: String? = null
@@ -13,7 +15,7 @@ class ConversionResult {
 
         this.errorMessage = errorMessage
     }
-
+    @Keep
     enum class ConversionCode {
         SUCCESS,
         FAILED
