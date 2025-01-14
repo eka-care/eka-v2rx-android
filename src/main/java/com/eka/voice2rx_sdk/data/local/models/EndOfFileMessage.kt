@@ -1,8 +1,10 @@
 package com.eka.voice2rx_sdk.data.local.models
 
 
+import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
 
+@Keep
 data class EndOfFileMessage(
     @SerializedName("chunks_info")
     var chunksInfo: Map<String, FileInfo>?,
