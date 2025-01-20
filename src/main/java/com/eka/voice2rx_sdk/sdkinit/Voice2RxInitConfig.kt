@@ -1,8 +1,10 @@
 package com.eka.voice2rx_sdk.sdkinit
 
+import androidx.annotation.Keep
 import androidx.compose.runtime.Composable
 import com.eka.voice2rx_sdk.data.local.models.ContextData
 
+@Keep
 data class Voice2RxInitConfig(
     val onStart: (sessionId: String) -> Unit,
     val onStop: (sessionId: String, recordedFiles : Int) -> Unit,
