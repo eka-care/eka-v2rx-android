@@ -1,7 +1,6 @@
 package com.eka.voice2rx_sdk.sdkinit
 
 import androidx.annotation.Keep
-import androidx.compose.runtime.Composable
 import com.eka.voice2rx_sdk.data.local.models.ContextData
 
 @Keep
