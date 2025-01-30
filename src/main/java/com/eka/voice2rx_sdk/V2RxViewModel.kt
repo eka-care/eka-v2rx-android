@@ -13,6 +13,7 @@ import com.eka.voice2rx_sdk.data.local.models.EndOfFileMessage
 import com.eka.voice2rx_sdk.data.local.models.FileInfo
 import com.eka.voice2rx_sdk.data.local.models.RecordingState
 import com.eka.voice2rx_sdk.data.local.models.StartOfMessage
+import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxType
 import com.eka.voice2rx_sdk.recorder.AudioCallback
 import com.eka.voice2rx_sdk.recorder.VoiceRecorder
@@ -115,7 +116,7 @@ class V2RxViewModel(
             uploadService.FILE_INDEX = 0
 
             isRecording = true
-            fullRecordingFile = File(app.filesDir, FULL_RECORDING_FILE_NAME)
+            fullRecordingFile = File(app.filesDir, Voice2RxUtils.getFullRecordingFileName(sessionId = sessionId.value))
             chunksInfo = mutableMapOf<String, FileInfo>()
             recorder.start(app, fullRecordingFile, vad.sampleRate.value, vad.frameSize.value)
             sendStartOfMessage(mode = mode)
@@ -162,6 +163,10 @@ class V2RxViewModel(
         _recordingState.value = RecordingState.INITIAL
     }
 
+    fun isRecording() : Boolean {
+        return isRecording
+    }
+
     fun dispose() {
         viewModelScope.launch {
             isRecording = false
@@ -178,11 +183,13 @@ class V2RxViewModel(
                     sessionId = sessionId.value,
                     filePaths = recordedFiles.toList(),
                     createdAt = Voice2RxUtils.getCurrentUTCEpochMillis(),
-                    fullAudioPath = FULL_RECORDING_FILE_NAME,
+                    fullAudioPath = Voice2RxUtils.getFullRecordingFileName(sessionId = sessionId.value),
                     ownerId = Voice2RxInit.getVoice2RxInitConfiguration().ownerId,
                     callerId = Voice2RxInit.getVoice2RxInitConfiguration().callerId,
                     patientId = Voice2RxInit.getVoice2RxInitConfiguration().contextData.patient?.id.toString(),
-                    mode = mode
+                    mode = mode,
+                    updatedSessionId = sessionId.value,
+                    status = Voice2RxSessionStatus.DRAFT
                 )
             )
         }
@@ -255,6 +262,16 @@ class V2RxViewModel(
                 timeStamp = timeStamp
             )
         )
+    }
+
+    fun updateSession(updatedSessionId : String, status : Voice2RxSessionStatus) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.updateSession(
+                sessionId = updatedSessionId.removePrefix("P-PP-"),
+                updatedSessionId = updatedSessionId,
+                status = status
+            )
+        }
     }
 
     fun getCombinedAudio(): ShortArray {
