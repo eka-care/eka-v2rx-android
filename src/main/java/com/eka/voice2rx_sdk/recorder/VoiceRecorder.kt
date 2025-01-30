@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.Process
 import android.util.Log
 import java.io.File
@@ -48,7 +49,7 @@ class VoiceRecorder(val callback: AudioCallback) {
 
         try {
 
-            mediaRecorder = MediaRecorder().apply {
+            mediaRecorder = createMediaRecorder(context).apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -58,6 +59,7 @@ class VoiceRecorder(val callback: AudioCallback) {
                 start()
             }
         } catch (e: IOException) {
+            Log.d("VoiceRecorder", e.printStackTrace().toString())
             e.printStackTrace()
         }
 
@@ -68,6 +70,14 @@ class VoiceRecorder(val callback: AudioCallback) {
             startTimestamp = System.currentTimeMillis()
             thread = Thread(ProcessVoice())
             thread?.start()
+        }
+    }
+
+    private fun createMediaRecorder(context: Context): MediaRecorder {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            MediaRecorder(context)
+        } else {
+            MediaRecorder()
         }
     }
 

@@ -1,5 +1,6 @@
 package com.eka.voice2rx_sdk.common
 
+import android.content.Context
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -32,5 +33,13 @@ object Voice2RxUtils {
 
     fun generateNewSessionId() : String {
         return UUID.randomUUID().toString() + "_" + System.currentTimeMillis()
+    }
+
+    fun getFullRecordingFileName(sessionId : String) : String {
+        return "${sessionId}_Full_Recording.m4a_"
+    }
+
+    fun getFilePath(context: Context, sessionId : String) : String {
+        return context.applicationContext.filesDir.absolutePath + "/" + getFullRecordingFileName(sessionId)
     }
 }
