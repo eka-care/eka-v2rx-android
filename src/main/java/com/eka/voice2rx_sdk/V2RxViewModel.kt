@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.amazonaws.services.s3.model.S3DataSource.Utils
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
@@ -15,11 +14,11 @@ import com.eka.voice2rx_sdk.data.local.models.RecordingState
 import com.eka.voice2rx_sdk.data.local.models.StartOfMessage
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxType
+import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
+import com.eka.voice2rx_sdk.data.repositories.VToRxRepository
 import com.eka.voice2rx_sdk.recorder.AudioCallback
 import com.eka.voice2rx_sdk.recorder.VoiceRecorder
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
-import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
-import com.eka.voice2rx_sdk.data.repositories.VToRxRepository
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInitConfig
 import com.google.gson.Gson
 import com.konovalov.vad.silero.Vad
@@ -32,7 +31,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
-import java.util.ArrayList
 import java.util.UUID
 
 class V2RxViewModel(
@@ -138,7 +136,8 @@ class V2RxViewModel(
             uuid = sessionId.value
         )
         Log.d(TAG, "SOM : " + Gson().toJson(som))
-        val somFile = saveJsonToFile("som.json", Gson().toJson(som))
+        val somFile = saveJsonToFile("${sessionId.value}_som.json", Gson().toJson(som))
+        recordedFiles.add(somFile.name)
         AwsS3UploadService.uploadFileToS3(app, "som.json", somFile, folderName, sessionId.value, isAudio = false)
     }
 
@@ -178,6 +177,7 @@ class V2RxViewModel(
 
     private fun storeSessionInDatabase(mode : Voice2RxType) {
         viewModelScope.launch(Dispatchers.IO) {
+            Log.d("VadViewModel", recordedFiles.toList().toString())
             repository.insertSession(
                 session = VToRxSession(
                     sessionId = sessionId.value,
@@ -220,7 +220,8 @@ class V2RxViewModel(
             chunksInfo = chunksInfo
         )
         Log.d(TAG, "EOF : " + Gson().toJson(eof))
-        val eofFile = saveJsonToFile("eof.json", Gson().toJson(eof))
+        val eofFile = saveJsonToFile("${sessionId.value}_eof.json", Gson().toJson(eof))
+        recordedFiles.add(eofFile.name)
         AwsS3UploadService.uploadFileToS3(app, "eof.json", eofFile, folderName, sessionId.value, isAudio = false)
     }
 

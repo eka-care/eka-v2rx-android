@@ -1,7 +1,6 @@
 package com.eka.voice2rx_sdk.data.remote.services
 
 import android.content.Context
-import android.util.Log
 import com.amazonaws.ClientConfiguration
 import com.amazonaws.auth.AWSSessionCredentials
 import com.amazonaws.auth.BasicSessionCredentials
@@ -66,8 +65,6 @@ class AwsS3UploadService {
 
             uploadObserver?.setTransferListener(object : TransferListener {
                 override fun onStateChanged(id: Int, state: TransferState?) {
-                    Log.d("AudioUploadService", "Upload state: ${state?.name}")
-
                     when(state) {
                         TransferState.COMPLETED -> {
                             deleteFile(file,isFullAudio)
@@ -83,11 +80,9 @@ class AwsS3UploadService {
 
                 override fun onProgressChanged(id: Int, bytesCurrent: Long, bytesTotal: Long) {
                     val percentDone = (bytesCurrent.toFloat() / bytesTotal.toFloat() * 100).toInt()
-                    Log.d("AudioUploadService", "Upload progress: $percentDone%")
                 }
 
                 override fun onError(id: Int, ex: Exception?) {
-                    Log.e("AudioUploadService", "Error during upload: ${ex?.message}")
                 }
             })
         }
