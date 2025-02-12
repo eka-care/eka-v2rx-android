@@ -2,6 +2,7 @@ package com.eka.voice2rx_sdk.data.remote.services
 
 import android.content.Context
 import android.util.Log
+import com.amazonaws.ClientConfiguration
 import com.amazonaws.auth.AWSSessionCredentials
 import com.amazonaws.auth.BasicSessionCredentials
 import com.amazonaws.mobileconnectors.s3.transferutility.TransferListener
@@ -40,7 +41,12 @@ class AwsS3UploadService {
                 voice2RxInitConfig.s3Config.sessionToken
             )
 
-            val s3Client = AmazonS3Client(sessionCredentials)
+            val clientConfiguration = ClientConfiguration().apply {
+                retryPolicy = ClientConfiguration.DEFAULT_RETRY_POLICY
+            }
+
+            val s3Client = AmazonS3Client(sessionCredentials, clientConfiguration)
+
             transferUtility = TransferUtility.builder()
                 .context(context)
                 .s3Client(s3Client)
@@ -67,13 +73,10 @@ class AwsS3UploadService {
                             deleteFile(file,isFullAudio)
                         }
                         TransferState.FAILED -> {
-                            deleteFile(file,isFullAudio)
                         }
                         TransferState.CANCELED -> {
-                            deleteFile(file,isFullAudio)
                         }
                         else -> {
-
                         }
                     }
                 }
