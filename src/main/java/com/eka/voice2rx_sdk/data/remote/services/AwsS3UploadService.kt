@@ -10,95 +10,108 @@ import com.amazonaws.mobileconnectors.s3.transferutility.TransferState
 import com.amazonaws.mobileconnectors.s3.transferutility.TransferUtility
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.ObjectMetadata
+import com.eka.voice2rx_sdk.common.ResponseState
+import com.eka.voice2rx_sdk.common.UploadListener
+import com.eka.voice2rx_sdk.sdkinit.AwsS3Configuration
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 
-class AwsS3UploadService {
+object AwsS3UploadService {
 
-    companion object {
-        const val TAG = "AwsS3UploadService"
-        private var transferUtility: TransferUtility? = null
+    const val TAG = "AwsS3UploadService"
+    private var transferUtility: TransferUtility? = null
+    private var uploadListener : UploadListener? = null
 
-        fun uploadFileToS3(
-            context: Context,
-            fileName: String,
-            file: File,
-            folderName: String,
-            sessionId: String,
-            isAudio : Boolean = true,
-            isFullAudio : Boolean = false,
-        ) {
-            TransferNetworkLossHandler.getInstance(context.applicationContext)
-            val voice2RxInitConfig = Voice2RxInit.getVoice2RxInitConfiguration()
+    fun setUploadListener(listener: UploadListener) {
+        uploadListener = listener
+    }
 
-            val sessionCredentials: AWSSessionCredentials = BasicSessionCredentials(
-                voice2RxInitConfig.s3Config.accessKey,
-                voice2RxInitConfig.s3Config.secretKey,
-                voice2RxInitConfig.s3Config.sessionToken
-            )
+    fun uploadFileToS3(
+        context: Context,
+        fileName: String,
+        file: File,
+        folderName: String,
+        sessionId: String,
+        isAudio : Boolean = true,
+        isFullAudio : Boolean = false,
+        s3Config : AwsS3Configuration? = null,
+        onResponse : (ResponseState) -> Unit = {},
+    ) {
+        TransferNetworkLossHandler.getInstance(context.applicationContext)
+        val voice2RxInitConfig = Voice2RxInit.getVoice2RxInitConfiguration()
 
-            val clientConfiguration = ClientConfiguration().apply {
-                retryPolicy = ClientConfiguration.DEFAULT_RETRY_POLICY
-            }
+        val sessionCredentials: AWSSessionCredentials = BasicSessionCredentials(
+            s3Config?.accessKey ?: voice2RxInitConfig.s3Config.accessKey,
+            s3Config?.secretKey ?: voice2RxInitConfig.s3Config.secretKey,
+            s3Config?.sessionToken ?: voice2RxInitConfig.s3Config.sessionToken
+        )
 
-            val s3Client = AmazonS3Client(sessionCredentials, clientConfiguration)
-
-            transferUtility = TransferUtility.builder()
-                .context(context)
-                .s3Client(s3Client)
-                .build()
-
-            val key = "$folderName/$sessionId/${fileName}"
-
-            val metadata = ObjectMetadata()
-            if(isAudio) {
-                metadata.contentType = "audio/wav"
-            } else {
-                metadata.contentType = "application/json"
-            }
-
-            val uploadObserver =
-                transferUtility?.upload(voice2RxInitConfig.s3Config.bucketName, key, file,metadata)
-
-            uploadObserver?.setTransferListener(object : TransferListener {
-                override fun onStateChanged(id: Int, state: TransferState?) {
-                    when(state) {
-                        TransferState.COMPLETED -> {
-                            deleteFile(file,isFullAudio)
-                        }
-                        TransferState.FAILED -> {
-                        }
-                        TransferState.CANCELED -> {
-                        }
-                        else -> {
-                        }
-                    }
-                }
-
-                override fun onProgressChanged(id: Int, bytesCurrent: Long, bytesTotal: Long) {
-                    val percentDone = (bytesCurrent.toFloat() / bytesTotal.toFloat() * 100).toInt()
-                }
-
-                override fun onError(id: Int, ex: Exception?) {
-                }
-            })
+        val clientConfiguration = ClientConfiguration().apply {
+            retryPolicy = ClientConfiguration.DEFAULT_RETRY_POLICY
         }
 
-        fun deleteFile(file: File, isFullAudio: Boolean) {
-            if(isFullAudio){
-                return
-            }
-            CoroutineScope(Dispatchers.IO).launch {
-                if (file.exists()) {
-                    try {
-                        file.delete()
-                    } catch (e: Exception) {
+        val s3Client = AmazonS3Client(sessionCredentials, clientConfiguration)
+
+        transferUtility = TransferUtility.builder()
+            .context(context)
+            .s3Client(s3Client)
+            .build()
+
+        val key = "$folderName/$sessionId/${fileName}"
+
+        val metadata = ObjectMetadata()
+        if(isAudio) {
+            metadata.contentType = "audio/wav"
+        } else {
+            metadata.contentType = "application/json"
+        }
+
+        val uploadObserver =
+            transferUtility?.upload(voice2RxInitConfig.s3Config.bucketName, key, file,metadata)
+
+        uploadObserver?.setTransferListener(object : TransferListener {
+            override fun onStateChanged(id: Int, state: TransferState?) {
+                when(state) {
+                    TransferState.COMPLETED -> {
+                        deleteFile(file,!isFullAudio && isAudio)
+                        onResponse(ResponseState.Success(true))
                     }
+                    TransferState.FAILED -> {
+                        onResponse(ResponseState.Error("FAILED"))
+                    }
+                    TransferState.CANCELED -> {
+                        onResponse(ResponseState.Error("CANCELED"))
+                    }
+                    else -> {
+                    }
+                }
+            }
+
+            override fun onProgressChanged(id: Int, bytesCurrent: Long, bytesTotal: Long) {
+                val percentDone = (bytesCurrent.toFloat() / bytesTotal.toFloat() * 100).toInt()
+            }
+
+            override fun onError(id: Int, ex: Exception?) {
+                onResponse(ResponseState.Error("FAILED"))
+            }
+        })
+    }
+
+    fun deleteFile(file: File, isAudioChunk : Boolean) {
+        if(!isAudioChunk){
+            return
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            if (file.exists()) {
+                try {
+                    file.delete()
+                } catch (e: Exception) {
                 }
             }
         }
     }
+
 }

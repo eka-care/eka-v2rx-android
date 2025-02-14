@@ -89,7 +89,7 @@ class AudioCombiner {
     }
 
     fun deleteWavFile(file : File) {
-        AwsS3UploadService.deleteFile(file, isFullAudio = false)
+        AwsS3UploadService.deleteFile(file, isAudioChunk = true)
     }
 
     fun writeM4a_File(

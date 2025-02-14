@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.eka.voice2rx_sdk.common.UploadListener
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
@@ -35,7 +36,7 @@ import java.util.UUID
 
 class V2RxViewModel(
     val app: Application,
-) : AndroidViewModel(app), AudioCallback {
+) : AndroidViewModel(app), AudioCallback, UploadListener {
 
     companion object {
         const val TAG = "VADViewModel"
@@ -80,11 +81,13 @@ class V2RxViewModel(
         UUID.randomUUID().toString() + "_" + "Full_Recording.m4a_"
 
     private lateinit var fullRecordingFile: File
+    private var sessionUploadStatus = true
 
     fun initValues() {
         bucketName = Voice2RxInit.getVoice2RxInitConfiguration().s3Config.bucketName
         folderName = Voice2RxUtils.getCurrentDateInYYMMDD()
         config = Voice2RxInit.getVoice2RxInitConfiguration()
+        AwsS3UploadService.setUploadListener(this)
     }
 
     fun addValueToChunksInfo(fileName: String, fileInfo: FileInfo) {
@@ -98,6 +101,7 @@ class V2RxViewModel(
 
     fun startRecording(mode : Voice2RxType) {
         viewModelScope.launch {
+            sessionUploadStatus = true
             sessionId.value = Voice2RxInit.getVoice2RxInitConfiguration().sessionId
 
             vad = Vad.builder()
@@ -157,7 +161,11 @@ class V2RxViewModel(
             uploadWholeFileData()
             sendEndOfMessage()
             storeSessionInDatabase(mode)
-            config.onStop.invoke(sessionId.value, chunksInfo.size + 2)
+            if(sessionUploadStatus) {
+                config.onStop.invoke(sessionId.value, chunksInfo.size + 2)
+            } else {
+                config.onError.invoke(sessionId.value)
+            }
         }
         _recordingState.value = RecordingState.INITIAL
     }
@@ -298,5 +306,14 @@ class V2RxViewModel(
         if (::vad.isInitialized) {
             vad.close()
         }
+    }
+
+    override fun onSuccess(sessionId: String, fileName: String) {
+        Log.d(TAG, "Upload Successful : ${sessionId} ${fileName}")
+    }
+
+    override fun onError(sessionId: String, fileName: String, errorMsg: String) {
+        Log.d(TAG, "Upload Failed : ${sessionId} ${fileName}")
+        sessionUploadStatus = false
     }
 }
