@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.eka.voice2rx_sdk"
     compileSdk = 34
-    buildToolsVersion = "30.0.3"
+//    buildToolsVersion = "30.0.3"
 
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -46,12 +46,8 @@ android {
             )
         }
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.3"
-    }
 
     buildFeatures {
-        compose = true
         buildConfig = true
     }
 
@@ -62,6 +58,12 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    packagingOptions {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
@@ -87,7 +89,6 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
-    implementation(libs.androidx.compose.material3)
     api(libs.silero)
     implementation(libs.aws.android.sdk.s3)
     implementation(libs.aws.android.sdk.core)
