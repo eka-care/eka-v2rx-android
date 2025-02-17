@@ -15,6 +15,7 @@ import com.eka.voice2rx_sdk.common.UploadListener
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.sdkinit.AwsS3Configuration
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
+import com.eka.voice2rx_sdk.sdkinit.Voice2RxInitConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,7 +43,11 @@ object AwsS3UploadService {
         onResponse : (ResponseState) -> Unit = {},
     ) {
         TransferNetworkLossHandler.getInstance(context.applicationContext)
-        val voice2RxInitConfig = Voice2RxInit.getVoice2RxInitConfiguration()
+        var voice2RxInitConfig : Voice2RxInitConfig? = null
+        try {
+            voice2RxInitConfig = Voice2RxInit.getVoice2RxInitConfiguration()
+        } catch (e : Exception) {
+        }
 
         if(!Voice2RxUtils.isNetworkAvailable(context)) {
             onResponse(ResponseState.Error("No Internet!"))
@@ -51,9 +56,9 @@ object AwsS3UploadService {
         }
 
         val sessionCredentials: AWSSessionCredentials = BasicSessionCredentials(
-            s3Config?.accessKey ?: voice2RxInitConfig.s3Config.accessKey,
-            s3Config?.secretKey ?: voice2RxInitConfig.s3Config.secretKey,
-            s3Config?.sessionToken ?: voice2RxInitConfig.s3Config.sessionToken
+            s3Config?.accessKey ?: voice2RxInitConfig?.s3Config?.accessKey,
+            s3Config?.secretKey ?: voice2RxInitConfig?.s3Config?.secretKey,
+            s3Config?.sessionToken ?: voice2RxInitConfig?.s3Config?.sessionToken
         )
 
         val clientConfiguration = ClientConfiguration().apply {
@@ -77,7 +82,7 @@ object AwsS3UploadService {
         }
 
         val uploadObserver =
-            transferUtility?.upload(voice2RxInitConfig.s3Config.bucketName, key, file,metadata)
+            transferUtility?.upload(s3Config?.bucketName ?: voice2RxInitConfig?.s3Config?.bucketName, key, file,metadata)
 
         uploadObserver?.setTransferListener(object : TransferListener {
             override fun onStateChanged(id: Int, state: TransferState?) {

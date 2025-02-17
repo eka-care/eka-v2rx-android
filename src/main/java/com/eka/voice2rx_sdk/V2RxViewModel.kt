@@ -104,6 +104,7 @@ class V2RxViewModel(
         viewModelScope.launch {
             sessionUploadStatus = true
             sessionId.value = Voice2RxInit.getVoice2RxInitConfiguration().sessionId
+            recordedFiles.clear()
 
             vad = Vad.builder()
                 .setContext(app)
