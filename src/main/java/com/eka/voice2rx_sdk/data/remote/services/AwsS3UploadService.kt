@@ -78,12 +78,15 @@ object AwsS3UploadService {
                     TransferState.COMPLETED -> {
                         deleteFile(file,!isFullAudio && isAudio)
                         onResponse(ResponseState.Success(true))
+                        uploadListener?.onSuccess(sessionId = sessionId, fileName)
                     }
                     TransferState.FAILED -> {
                         onResponse(ResponseState.Error("FAILED"))
+                        uploadListener?.onError(sessionId = sessionId, fileName = fileName, errorMsg = "FAILED")
                     }
                     TransferState.CANCELED -> {
                         onResponse(ResponseState.Error("CANCELED"))
+                        uploadListener?.onError(sessionId = sessionId, fileName = fileName, errorMsg = "CANCELED")
                     }
                     else -> {
                     }
@@ -95,6 +98,7 @@ object AwsS3UploadService {
             }
 
             override fun onError(id: Int, ex: Exception?) {
+                uploadListener?.onError(sessionId = sessionId, fileName = fileName, errorMsg = "CANCELED")
                 onResponse(ResponseState.Error("FAILED"))
             }
         })
