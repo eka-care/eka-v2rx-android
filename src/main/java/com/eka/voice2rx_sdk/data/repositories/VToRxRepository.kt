@@ -99,7 +99,7 @@ class VToRxRepository(
                             if (file.exists()) {
                                 AwsS3UploadService.uploadFileToS3(
                                     context = context,
-                                    fileName = filePath.split(".").first().split("_").last(),
+                                    fileName = filePath.split("_").last(),
                                     folderName = Voice2RxUtils.getTimeStampInYYMMDD(session.createdAt),
                                     file = file,
                                     sessionId = sessionId,

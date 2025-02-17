@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.eka.voice2rx_sdk.common.ResponseState
 import com.eka.voice2rx_sdk.common.UploadListener
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
@@ -164,7 +165,18 @@ class V2RxViewModel(
             if(sessionUploadStatus) {
                 config.onStop.invoke(sessionId.value, chunksInfo.size + 2)
             } else {
-                config.onError.invoke(sessionId.value)
+                repository.retrySessionUploading(
+                    context = app,
+                    sessionId = sessionId.value,
+                    s3Config = Voice2RxInit.getVoice2RxInitConfiguration().s3Config,
+                    onResponse = {
+                        if(it is ResponseState.Success && it.isCompleted) {
+                            config.onStop.invoke(sessionId.value, chunksInfo.size + 2)
+                        } else {
+                            config.onError.invoke(sessionId.value)
+                        }
+                    }
+                )
             }
         }
         _recordingState.value = RecordingState.INITIAL

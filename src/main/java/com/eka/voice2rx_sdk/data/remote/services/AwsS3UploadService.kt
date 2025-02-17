@@ -12,6 +12,7 @@ import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.eka.voice2rx_sdk.common.ResponseState
 import com.eka.voice2rx_sdk.common.UploadListener
+import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.sdkinit.AwsS3Configuration
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +43,12 @@ object AwsS3UploadService {
     ) {
         TransferNetworkLossHandler.getInstance(context.applicationContext)
         val voice2RxInitConfig = Voice2RxInit.getVoice2RxInitConfiguration()
+
+        if(!Voice2RxUtils.isNetworkAvailable(context)) {
+            onResponse(ResponseState.Error("No Internet!"))
+            uploadListener?.onError(sessionId = sessionId, fileName = fileName, errorMsg = "No Internet!")
+            return
+        }
 
         val sessionCredentials: AWSSessionCredentials = BasicSessionCredentials(
             s3Config?.accessKey ?: voice2RxInitConfig.s3Config.accessKey,
