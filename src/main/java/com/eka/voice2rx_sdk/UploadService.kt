@@ -1,8 +1,8 @@
 package com.eka.voice2rx_sdk
 
 import android.content.Context
-import android.util.Log
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
+import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +53,7 @@ class UploadService(
                     audioHelper.removeData(0, clipIndex)
                 }
             } catch (e: Exception) {
-                Log.d(TAG, e.printStackTrace().toString())
+                VoiceLogger.d(TAG, e.printStackTrace().toString())
             }
         }
     }

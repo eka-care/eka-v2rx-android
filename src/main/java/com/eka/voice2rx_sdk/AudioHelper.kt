@@ -1,8 +1,8 @@
 package com.eka.voice2rx_sdk
 
 import android.content.Context
-import android.util.Log
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
+import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.models.FileInfo
 
 class AudioHelper(
@@ -83,7 +83,7 @@ class AudioHelper(
         currentClipIndex = audioRecordData.size
         clipPoints.add(currentClipIndex)
         isClipping = true
-        Log.d(TAG, "Clip detected at index: $currentClipIndex")
+        VoiceLogger.d(TAG, "Clip detected at index: $currentClipIndex")
         return true
     }
 

@@ -2,9 +2,9 @@ package com.eka.voice2rx_sdk
 
 import android.content.Context
 import android.media.MediaPlayer
-import android.util.Log
 import com.eka.voice2rx_sdk.audio_converters.ConversionResult
 import com.eka.voice2rx_sdk.audio_converters.WAVtoM4AConverter
+import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
 import java.io.File
 import java.io.FileOutputStream
@@ -46,7 +46,7 @@ class AudioCombiner {
         folderName: String,
         sessionId: String
     ) {
-//        Log.d(TAG,outputFile.name + " " + (audioData.size))
+//        VoiceLogger.d(TAG,outputFile.name + " " + (audioData.size))
         val byteData = ByteArray(audioData.size * 2)
         ByteBuffer.wrap(byteData).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(audioData)
 
@@ -83,7 +83,7 @@ class AudioCombiner {
                     )
                 }
             } else {
-                Log.d(TAG, "Error : ${result.errorMessage}")
+                VoiceLogger.d(TAG, "Error : ${result.errorMessage}")
             }
         }
     }

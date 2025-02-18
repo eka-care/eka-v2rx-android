@@ -1,9 +1,9 @@
 package com.eka.voice2rx_sdk.data.repositories
 
 import android.content.Context
-import android.util.Log
 import com.eka.voice2rx_sdk.common.ResponseState
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
+import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
@@ -122,7 +122,7 @@ class VToRxRepository(
 
         val file = File(context.filesDir, filePath)
         if (!file.exists()) {
-            Log.e("Retry Session", "File Not Found!")
+            VoiceLogger.e("Retry Session", "File Not Found!")
             trySend(true)
             close()
             return@callbackFlow
@@ -147,7 +147,7 @@ class VToRxRepository(
                 }
             )
         } catch (e: Exception) {
-            Log.e("Retry Session", "Upload failed: ${e.message}")
+            VoiceLogger.e("Retry Session", "Upload failed: ${e.message}")
             trySend(false)
             close()
         }

@@ -1,13 +1,13 @@
 package com.eka.voice2rx_sdk
 
 import android.app.Application
-import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eka.voice2rx_sdk.common.ResponseState
 import com.eka.voice2rx_sdk.common.UploadListener
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
+import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.models.EndOfFileMessage
@@ -141,7 +141,7 @@ class V2RxViewModel(
             s3Url = s3Url,
             uuid = sessionId.value
         )
-        Log.d(TAG, "SOM : " + Gson().toJson(som))
+        VoiceLogger.d(TAG, "SOM : " + Gson().toJson(som))
         val somFile = saveJsonToFile("${sessionId.value}_som.json", Gson().toJson(som))
         recordedFiles.add(somFile.name)
         AwsS3UploadService.uploadFileToS3(app, "som.json", somFile, folderName, sessionId.value, isAudio = false)
@@ -198,7 +198,7 @@ class V2RxViewModel(
 
     private fun storeSessionInDatabase(mode : Voice2RxType) {
         viewModelScope.launch(Dispatchers.IO) {
-            Log.d("VadViewModel", recordedFiles.toList().toString())
+            VoiceLogger.d("VadViewModel", recordedFiles.toList().toString())
             repository.insertSession(
                 session = VToRxSession(
                     sessionId = sessionId.value,
@@ -240,7 +240,7 @@ class V2RxViewModel(
             uuid = sessionId.value,
             chunksInfo = chunksInfo
         )
-        Log.d(TAG, "EOF : " + Gson().toJson(eof))
+        VoiceLogger.d(TAG, "EOF : " + Gson().toJson(eof))
         val eofFile = saveJsonToFile("${sessionId.value}_eof.json", Gson().toJson(eof))
         recordedFiles.add(eofFile.name)
         AwsS3UploadService.uploadFileToS3(app, "eof.json", eofFile, folderName, sessionId.value, isAudio = false)
@@ -260,7 +260,7 @@ class V2RxViewModel(
     }
 
     override fun onAudio(audioData: ShortArray, timeStamp: Long) {
-//        Log.d("ProcessVoice","onAudio")
+//        VoiceLogger.d("ProcessVoice","onAudio")
         audioChunks.add(audioData)
         if (audioChunks.size > 300) {
             audioChunks.removeFirst()
@@ -297,7 +297,7 @@ class V2RxViewModel(
     }
 
     fun getCombinedAudio(): ShortArray {
-        Log.d("ViewModel", "AudioChunks size : " + audioChunks.size.toString())
+        VoiceLogger.d("ViewModel", "AudioChunks size : " + audioChunks.size.toString())
         val totalSize = audioChunks.sumOf { it.size }
         val combinedAudio = ShortArray(totalSize)
         var currentIndex = 0
@@ -322,11 +322,11 @@ class V2RxViewModel(
     }
 
     override fun onSuccess(sessionId: String, fileName: String) {
-        Log.d(TAG, "Upload Successful : ${sessionId} ${fileName}")
+        VoiceLogger.d(TAG, "Upload Successful : ${sessionId} ${fileName}")
     }
 
     override fun onError(sessionId: String, fileName: String, errorMsg: String) {
-        Log.d(TAG, "Upload Failed : ${sessionId} ${fileName}")
+        VoiceLogger.d(TAG, "Upload Failed : ${sessionId} ${fileName}")
         sessionUploadStatus = false
     }
 }
