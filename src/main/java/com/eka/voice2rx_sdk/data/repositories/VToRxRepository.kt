@@ -11,8 +11,9 @@ import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
 import com.eka.voice2rx_sdk.sdkinit.AwsS3Configuration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -89,34 +90,12 @@ class VToRxRepository(
         CoroutineScope(Dispatchers.IO).launch {
             val session = getSessionBySessionId(sessionId = sessionId)
             try {
-                val uploadResults = session?.filePaths?.map { filePath ->
-                    async {
-                        if(!Voice2RxUtils.isNetworkAvailable(context)) {
-                            return@async false
-                        }
-                        val file = File(context.filesDir, filePath)
-                        try {
-                            if (file.exists()) {
-                                AwsS3UploadService.uploadFileToS3(
-                                    context = context,
-                                    fileName = filePath.split("_").last(),
-                                    folderName = Voice2RxUtils.getTimeStampInYYMMDD(session.createdAt),
-                                    file = file,
-                                    sessionId = sessionId,
-                                    isAudio = isAudioFile(filePath),
-                                    s3Config = s3Config,
-                                )
-                            } else {
-                                Log.e("Retry Session", "File Not Found!")
-                            }
-                            true
-                        } catch (e: Exception) {
-                            Log.d("Retry Session", e.message.toString())
-                            false
-                        }
-                    }
-                }
-                val results = uploadResults?.awaitAll()
+                val results = session?.filePaths
+                    ?.map { filePath ->
+                        uploadFileFlow(filePath, session.createdAt, sessionId, s3Config, context)
+                            .toList()
+                    }?.flatten()
+
                 if(results != null && results.all { it }) {
                     onResponse(ResponseState.Success(true))
                 } else {
@@ -126,6 +105,54 @@ class VToRxRepository(
                 onResponse(ResponseState.Error(error?.message ?: "Something went wrong!"))
             }
         }
+    }
+
+    fun uploadFileFlow(
+        filePath: String,
+        createdAt: Long,
+        sessionId: String,
+        s3Config: AwsS3Configuration,
+        context: Context
+    ) = callbackFlow {
+        if (!Voice2RxUtils.isNetworkAvailable(context)) {
+            trySend(false)
+            close()
+            return@callbackFlow
+        }
+
+        val file = File(context.filesDir, filePath)
+        if (!file.exists()) {
+            Log.e("Retry Session", "File Not Found!")
+            trySend(true)
+            close()
+            return@callbackFlow
+        }
+
+        try {
+            AwsS3UploadService.uploadFileToS3(
+                context = context,
+                fileName = filePath.split("_").last(),
+                folderName = Voice2RxUtils.getTimeStampInYYMMDD(createdAt),
+                file = file,
+                sessionId = sessionId,
+                isAudio = isAudioFile(filePath),
+                s3Config = s3Config,
+                onResponse = { response ->
+                    if(response is ResponseState.Success && response.isCompleted) {
+                        trySend(true)
+                    } else {
+                        trySend(false)
+                    }
+                    close()
+                }
+            )
+        } catch (e: Exception) {
+            Log.e("Retry Session", "Upload failed: ${e.message}")
+            trySend(false)
+            close()
+        }
+
+        awaitClose {}
     }
 
     private fun isAudioFile(fileName : String) : Boolean {
