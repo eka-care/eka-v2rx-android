@@ -7,6 +7,7 @@ import com.eka.voice2rx_sdk.data.local.models.ContextData
 data class Voice2RxInitConfig(
     val onStart: (sessionId: String) -> Unit,
     val onStop: (sessionId: String, recordedFiles : Int) -> Unit,
+    val onError : (sessionId : String) -> Unit,
     val s3Config: AwsS3Configuration,
     val docOid: String,
     val docUuid: String,

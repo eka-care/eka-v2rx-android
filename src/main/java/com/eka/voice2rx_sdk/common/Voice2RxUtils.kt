@@ -1,6 +1,9 @@
 package com.eka.voice2rx_sdk.common
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -14,6 +17,12 @@ object Voice2RxUtils {
     }
     fun getCurrentDateInYYMMDD(): String {
         val date = Date()
+        val formatter = SimpleDateFormat("yyMMdd", Locale.getDefault())
+        return formatter.format(date)
+    }
+
+    fun getTimeStampInYYMMDD(utc : Long) : String {
+        val date = Date(utc)
         val formatter = SimpleDateFormat("yyMMdd", Locale.getDefault())
         return formatter.format(date)
     }
@@ -41,5 +50,24 @@ object Voice2RxUtils {
 
     fun getFilePath(context: Context, sessionId : String) : String {
         return context.applicationContext.filesDir.absolutePath + "/" + getFullRecordingFileName(sessionId)
+    }
+
+    fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork) ?: return false
+            return when {
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ->    true
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ->   true
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ->   true
+                else ->     false
+            }
+        }
+        else {
+            if (connectivityManager.activeNetworkInfo != null && connectivityManager.activeNetworkInfo!!.isConnectedOrConnecting) {
+                return true
+            }
+        }
+        return false
     }
 }

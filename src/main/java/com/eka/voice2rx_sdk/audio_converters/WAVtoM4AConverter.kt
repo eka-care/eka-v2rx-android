@@ -4,7 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
-import android.util.Log
+import com.eka.voice2rx_sdk.common.VoiceLogger
 import java.io.File
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -27,7 +27,7 @@ class WAVtoM4AConverter(
         destinationM4aFile: File,
         onResult: (ConversionResult) -> Unit
     ) {
-        Log.i("WavToM4AConverter", "Start conversion from WAV to M4A")
+        VoiceLogger.d("WavToM4AConverter", "Start conversion from WAV to M4A")
         val muxer = MediaMuxer(
             destinationM4aFile.absolutePath,
             MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4
@@ -45,7 +45,7 @@ class WAVtoM4AConverter(
                 dequeueOutputBuffer(muxer, codec, outputBuffInfo)
             }
         } catch (error: Error) {
-            Log.e(
+            VoiceLogger.e(
                 "WavToM4AConverter",
                 "Error while converting WAV to M4A. Error message: ${error.message}"
             )
@@ -122,7 +122,7 @@ class WAVtoM4AConverter(
             } else if (outputBufferIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 throw Error("WavToM4AConverter. INFO_TRY_AGAIN_LATER")
             } else {
-                Log.d(
+                VoiceLogger.d(
                     "WavToM4AConverter",
                     "Unknown return code from dequeueOutputBuffer - " + outputBufferIndex
                 )
