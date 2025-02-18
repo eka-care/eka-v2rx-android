@@ -7,7 +7,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.Process
-import android.util.Log
+import com.eka.voice2rx_sdk.common.VoiceLogger
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -59,7 +59,7 @@ class VoiceRecorder(val callback: AudioCallback) {
                 start()
             }
         } catch (e: IOException) {
-            Log.d("VoiceRecorder", e.printStackTrace().toString())
+            VoiceLogger.d("VoiceRecorder", e.printStackTrace().toString())
             e.printStackTrace()
         }
 
@@ -123,7 +123,7 @@ class VoiceRecorder(val callback: AudioCallback) {
                 audioRecord.release()
             }
         } catch (e: IllegalArgumentException) {
-            Log.e(TAG, "Error can't create AudioRecord ", e)
+            VoiceLogger.e(TAG, "Error can't create AudioRecord ")
         }
         return null
     }
@@ -136,7 +136,7 @@ class VoiceRecorder(val callback: AudioCallback) {
             while (!Thread.interrupted() && isListening) {
                 val read = audioRecord?.read(buffer, 0, buffer.size)
                 if (read != null && read > 0) {
-//                    Log.d(TAG,read.toString())
+//                    VoiceLogger.d(TAG,read.toString())
                     callback.onAudio(buffer.copyOfRange(0, read), System.currentTimeMillis())
                 }
             }

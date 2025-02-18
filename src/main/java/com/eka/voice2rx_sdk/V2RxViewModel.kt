@@ -1,12 +1,13 @@
 package com.eka.voice2rx_sdk
 
 import android.app.Application
-import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.amazonaws.services.s3.model.S3DataSource.Utils
+import com.eka.voice2rx_sdk.common.ResponseState
+import com.eka.voice2rx_sdk.common.UploadListener
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
+import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.models.EndOfFileMessage
@@ -15,11 +16,11 @@ import com.eka.voice2rx_sdk.data.local.models.RecordingState
 import com.eka.voice2rx_sdk.data.local.models.StartOfMessage
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxType
+import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
+import com.eka.voice2rx_sdk.data.repositories.VToRxRepository
 import com.eka.voice2rx_sdk.recorder.AudioCallback
 import com.eka.voice2rx_sdk.recorder.VoiceRecorder
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInit
-import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
-import com.eka.voice2rx_sdk.data.repositories.VToRxRepository
 import com.eka.voice2rx_sdk.sdkinit.Voice2RxInitConfig
 import com.google.gson.Gson
 import com.konovalov.vad.silero.Vad
@@ -32,12 +33,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
-import java.util.ArrayList
 import java.util.UUID
 
 class V2RxViewModel(
     val app: Application,
-) : AndroidViewModel(app), AudioCallback {
+) : AndroidViewModel(app), AudioCallback, UploadListener {
 
     companion object {
         const val TAG = "VADViewModel"
@@ -82,11 +82,13 @@ class V2RxViewModel(
         UUID.randomUUID().toString() + "_" + "Full_Recording.m4a_"
 
     private lateinit var fullRecordingFile: File
+    private var sessionUploadStatus = true
 
     fun initValues() {
         bucketName = Voice2RxInit.getVoice2RxInitConfiguration().s3Config.bucketName
         folderName = Voice2RxUtils.getCurrentDateInYYMMDD()
         config = Voice2RxInit.getVoice2RxInitConfiguration()
+        AwsS3UploadService.setUploadListener(this)
     }
 
     fun addValueToChunksInfo(fileName: String, fileInfo: FileInfo) {
@@ -100,7 +102,9 @@ class V2RxViewModel(
 
     fun startRecording(mode : Voice2RxType) {
         viewModelScope.launch {
+            sessionUploadStatus = true
             sessionId.value = Voice2RxInit.getVoice2RxInitConfiguration().sessionId
+            recordedFiles.clear()
 
             vad = Vad.builder()
                 .setContext(app)
@@ -137,8 +141,9 @@ class V2RxViewModel(
             s3Url = s3Url,
             uuid = sessionId.value
         )
-        Log.d(TAG, "SOM : " + Gson().toJson(som))
-        val somFile = saveJsonToFile("som.json", Gson().toJson(som))
+        VoiceLogger.d(TAG, "SOM : " + Gson().toJson(som))
+        val somFile = saveJsonToFile("${sessionId.value}_som.json", Gson().toJson(som))
+        recordedFiles.add(somFile.name)
         AwsS3UploadService.uploadFileToS3(app, "som.json", somFile, folderName, sessionId.value, isAudio = false)
     }
 
@@ -158,7 +163,22 @@ class V2RxViewModel(
             uploadWholeFileData()
             sendEndOfMessage()
             storeSessionInDatabase(mode)
-            config.onStop.invoke(sessionId.value, chunksInfo.size + 2)
+            if(sessionUploadStatus) {
+                config.onStop.invoke(sessionId.value, chunksInfo.size + 2)
+            } else {
+                repository.retrySessionUploading(
+                    context = app,
+                    sessionId = sessionId.value,
+                    s3Config = Voice2RxInit.getVoice2RxInitConfiguration().s3Config,
+                    onResponse = {
+                        if(it is ResponseState.Success && it.isCompleted) {
+                            config.onStop.invoke(sessionId.value, chunksInfo.size + 2)
+                        } else {
+                            config.onError.invoke(sessionId.value)
+                        }
+                    }
+                )
+            }
         }
         _recordingState.value = RecordingState.INITIAL
     }
@@ -178,6 +198,7 @@ class V2RxViewModel(
 
     private fun storeSessionInDatabase(mode : Voice2RxType) {
         viewModelScope.launch(Dispatchers.IO) {
+            VoiceLogger.d("VadViewModel", recordedFiles.toList().toString())
             repository.insertSession(
                 session = VToRxSession(
                     sessionId = sessionId.value,
@@ -219,8 +240,9 @@ class V2RxViewModel(
             uuid = sessionId.value,
             chunksInfo = chunksInfo
         )
-        Log.d(TAG, "EOF : " + Gson().toJson(eof))
-        val eofFile = saveJsonToFile("eof.json", Gson().toJson(eof))
+        VoiceLogger.d(TAG, "EOF : " + Gson().toJson(eof))
+        val eofFile = saveJsonToFile("${sessionId.value}_eof.json", Gson().toJson(eof))
+        recordedFiles.add(eofFile.name)
         AwsS3UploadService.uploadFileToS3(app, "eof.json", eofFile, folderName, sessionId.value, isAudio = false)
     }
 
@@ -238,7 +260,7 @@ class V2RxViewModel(
     }
 
     override fun onAudio(audioData: ShortArray, timeStamp: Long) {
-//        Log.d("ProcessVoice","onAudio")
+//        VoiceLogger.d("ProcessVoice","onAudio")
         audioChunks.add(audioData)
         if (audioChunks.size > 300) {
             audioChunks.removeFirst()
@@ -275,7 +297,7 @@ class V2RxViewModel(
     }
 
     fun getCombinedAudio(): ShortArray {
-        Log.d("ViewModel", "AudioChunks size : " + audioChunks.size.toString())
+        VoiceLogger.d("ViewModel", "AudioChunks size : " + audioChunks.size.toString())
         val totalSize = audioChunks.sumOf { it.size }
         val combinedAudio = ShortArray(totalSize)
         var currentIndex = 0
@@ -297,5 +319,14 @@ class V2RxViewModel(
         if (::vad.isInitialized) {
             vad.close()
         }
+    }
+
+    override fun onSuccess(sessionId: String, fileName: String) {
+        VoiceLogger.d(TAG, "Upload Successful : ${sessionId} ${fileName}")
+    }
+
+    override fun onError(sessionId: String, fileName: String, errorMsg: String) {
+        VoiceLogger.d(TAG, "Upload Failed : ${sessionId} ${fileName}")
+        sessionUploadStatus = false
     }
 }
