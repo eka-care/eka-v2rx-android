@@ -22,6 +22,5 @@ data class Voice2RxInitConfig(
     val prefCutDuration: Int = 10,
     val despCutDuration: Int = 20,
     val maxCutDuration: Int = 25,
-    val sessionId : String = Voice2RxUtils.generateNewSessionId(),
     val okHttpSetup: IOkHttpSetup,
 )

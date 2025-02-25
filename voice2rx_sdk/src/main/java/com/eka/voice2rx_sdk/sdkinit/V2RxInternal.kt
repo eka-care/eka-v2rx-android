@@ -169,7 +169,7 @@ internal class V2RxInternal : AudioCallback, UploadListener {
             currentMode = mode
             getS3Config()
             sessionUploadStatus = true
-            sessionId.value = Voice2Rx.getVoice2RxInitConfiguration().sessionId
+            sessionId.value = Voice2RxUtils.generateNewSessionId()
             recordedFiles.clear()
 
             vad = Vad.builder()
