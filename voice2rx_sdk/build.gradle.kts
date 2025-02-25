@@ -68,9 +68,7 @@ dependencies {
     kapt(libs.room.compiler)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    implementation(libs.eka.network.android) {
-//        exclude(group = "com.google.protobuf", module = "protobuf-java")
-    }
+    api(libs.eka.network.android)
     implementation(libs.google.gson)
     implementation(libs.okhttp)
     implementation(libs.okhttp.urlconnection)
