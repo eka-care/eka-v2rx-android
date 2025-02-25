@@ -307,7 +307,6 @@ class V2RxViewModel(
             chunk.copyInto(combinedAudio, currentIndex)
             currentIndex += chunk.size
         }
-
         return combinedAudio
     }
 
