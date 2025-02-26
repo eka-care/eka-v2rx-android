@@ -20,7 +20,10 @@ object Voice2Rx {
         context: Context,
     ) {
         configuration = config
-        Networking.init("https://cog.eka.care/", config.okHttpSetup, converterFactoryType = ConverterFactoryType.GSON)
+        try {
+            Networking.init("https://cog.eka.care/", config.okHttpSetup, converterFactoryType = ConverterFactoryType.GSON)
+        } catch (_: Exception) {
+        }
         if(v2RxInternal == null) {
             v2RxInternal = V2RxInternal()
         }
