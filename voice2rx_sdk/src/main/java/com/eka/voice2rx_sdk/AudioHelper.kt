@@ -107,9 +107,8 @@ internal class AudioHelper(
     }
 
     fun uploadFullRecordingFile(fileName: String, onFileCreated: (File) -> Unit) {
-        val outputFileName = "${fileName}.m4a_"
         val wavFileName = "${fileName}.wav"
-        val outputFile = File(context.filesDir, outputFileName)
+        val outputFile = File(context.filesDir, fileName)
 
         AudioCombiner().writeWavFile(
             context,
