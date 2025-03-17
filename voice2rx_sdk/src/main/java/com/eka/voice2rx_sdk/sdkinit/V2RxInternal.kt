@@ -407,19 +407,21 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
     }
 
     private fun uploadWholeFileData() {
-        audioHelper.uploadFullRecordingFile(
-            Voice2RxUtils.getFullRecordingFileName(sessionId = sessionId),
-            onFileCreated = { file ->
-                uploadFileToS3(
-                    app,
-                    "full_audio.m4a_",
-                    file,
-                    folderName,
-                    sessionId,
-                    isFullAudio = true
-                )
-            }
-        )
+        CoroutineScope(Dispatchers.IO).launch {
+            audioHelper.uploadFullRecordingFile(
+                Voice2RxUtils.getFullRecordingFileName(sessionId = sessionId),
+                onFileCreated = { file ->
+                    uploadFileToS3(
+                        app,
+                        "full_audio.m4a_",
+                        file,
+                        folderName,
+                        sessionId,
+                        isFullAudio = true
+                    )
+                }
+            )
+        }
     }
 
     private fun sendStartOfMessage(mode : Voice2RxType) {
