@@ -262,7 +262,9 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
 
     private fun onLastFileUploadComplete(fileName: String, fileInfo: FileInfo) {
         coroutineScope.launch {
-            addValueToChunksInfo(fileName, fileInfo)
+            if (!fileName.isNullOrEmpty()) {
+                addValueToChunksInfo(fileName, fileInfo)
+            }
             uploadWholeFileData()
             sendEndOfMessage()
             storeSessionInDatabase(currentMode)

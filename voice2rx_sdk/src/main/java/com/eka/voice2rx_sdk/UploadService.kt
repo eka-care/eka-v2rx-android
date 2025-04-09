@@ -78,6 +78,7 @@ internal class UploadService(
         onFileUploaded: (String, FileInfo) -> Unit
     ) {
         if(audioData.size < 16000) {
+            onFileUploaded("", FileInfo(st = null, et = null))
             return
         }
         FILE_INDEX += 1
