@@ -20,6 +20,8 @@ import com.eka.voice2rx_sdk.data.local.models.RecordingState
 import com.eka.voice2rx_sdk.data.local.models.StartOfMessage
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxType
+import com.eka.voice2rx_sdk.data.remote.models.Error
+import com.eka.voice2rx_sdk.data.remote.models.SessionStatus
 import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
 import com.eka.voice2rx_sdk.data.repositories.VToRxRepository
 import com.eka.voice2rx_sdk.recorder.AudioCallback
@@ -263,6 +265,53 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
             )
         }
         _recordingState.value = RecordingState.INITIAL
+    }
+
+    suspend fun getVoice2RxStatus(sessionId: String): SessionStatus {
+        val response = repository.getVoice2RxStatus(sessionId)
+        VoiceLogger.d(TAG, "Session Status : ${Gson().toJson(response)}")
+        return when (response) {
+            is NetworkResponse.Success -> {
+                SessionStatus(
+                    sessionId = sessionId,
+                    status = response.body.status,
+                    error = null
+                )
+            }
+
+            is NetworkResponse.NetworkError -> {
+                SessionStatus(
+                    sessionId = sessionId,
+                    status = null,
+                    error = Error(
+                        message = "Network Error",
+                        code = "NETWORK_ERROR"
+                    )
+                )
+            }
+
+            is NetworkResponse.ServerError -> {
+                SessionStatus(
+                    sessionId = sessionId,
+                    status = null,
+                    error = Error(
+                        message = "Server Error",
+                        code = response.code.toString()
+                    )
+                )
+            }
+
+            else -> {
+                SessionStatus(
+                    sessionId = sessionId,
+                    status = null,
+                    error = Error(
+                        message = "Error getting session status",
+                        code = "UNKNOWN_ERROR"
+                    )
+                )
+            }
+        }
     }
 
     private fun onLastFileUploadComplete(

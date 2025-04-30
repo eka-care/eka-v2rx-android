@@ -4,12 +4,14 @@ import android.content.Context
 import com.eka.network.ConverterFactoryType
 import com.eka.network.Networking
 import com.eka.voice2rx.data.remote.models.AwsS3ConfigResponse
+import com.eka.voice2rx_sdk.BuildConfig
 import com.eka.voice2rx_sdk.common.ResponseState
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
+import com.eka.voice2rx_sdk.data.remote.models.Voice2RxStatusResponse
 import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
 import com.eka.voice2rx_sdk.data.remote.services.Voice2RxService
 import com.eka.voice2rx_sdk.sdkinit.AwsS3Configuration
@@ -28,7 +30,22 @@ internal class VToRxRepository(
 ) {
 
     private val remoteDataSource: Voice2RxService =
-        Networking.create(Voice2RxService::class.java, "", ConverterFactoryType.GSON)
+        Networking.create(
+            Voice2RxService::class.java,
+            BuildConfig.DEVELOPER_URL,
+            ConverterFactoryType.GSON
+        )
+
+    suspend fun getVoice2RxStatus(sessionId: String): NetworkResponse<Voice2RxStatusResponse, Voice2RxStatusResponse> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = remoteDataSource.getVoice2RxStatus(sessionId = sessionId)
+                response
+            } catch (e: Exception) {
+                NetworkResponse.UnknownError(error = e)
+            }
+        }
+    }
 
     suspend fun insertSession(session: VToRxSession) {
         withContext(Dispatchers.IO) {
@@ -97,7 +114,7 @@ internal class VToRxRepository(
     }
 
     suspend fun getAwsS3Config(): NetworkResponse<AwsS3ConfigResponse, AwsS3ConfigResponse> {
-        val url = "https://cog.eka.care/credentials"
+        val url = BuildConfig.COG_URL + "credentials"
         return withContext(Dispatchers.IO) {
             try {
                 val response = remoteDataSource.getS3Config(url)

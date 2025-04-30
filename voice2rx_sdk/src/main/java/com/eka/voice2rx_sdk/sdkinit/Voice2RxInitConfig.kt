@@ -1,9 +1,9 @@
 package com.eka.voice2rx_sdk.sdkinit
 
 import androidx.annotation.Keep
-import com.eka.network.IOkHttpSetup
 import com.eka.voice2rx_sdk.common.models.VoiceError
 import com.eka.voice2rx_sdk.data.local.models.ContextData
+import com.eka.voice2rx_sdk.sdkinit.ekaauth.EkaAuthConfig
 import com.konovalov.vad.silero.config.FrameSize
 import com.konovalov.vad.silero.config.SampleRate
 
@@ -24,5 +24,6 @@ data class Voice2RxInitConfig(
     val prefCutDuration: Int = 10,
     val despCutDuration: Int = 20,
     val maxCutDuration: Int = 25,
-    val okHttpSetup: IOkHttpSetup,
+    val authorizationToken: String,
+    val ekaAuthConfig: EkaAuthConfig? = null,
 )
