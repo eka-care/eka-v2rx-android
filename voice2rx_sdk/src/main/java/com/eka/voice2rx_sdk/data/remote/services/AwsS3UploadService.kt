@@ -18,6 +18,7 @@ import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
+import com.eka.voice2rx_sdk.data.local.db.entities.VoiceFileType
 import com.eka.voice2rx_sdk.data.repositories.VToRxRepository
 import com.eka.voice2rx_sdk.sdkinit.AwsS3Configuration
 import com.eka.voice2rx_sdk.sdkinit.V2RxInternal
@@ -44,9 +45,9 @@ object AwsS3UploadService {
         file: File,
         folderName: String,
         sessionId: String,
-        isAudio: Boolean = true,
-        isFullAudio: Boolean = false,
+        voiceFileType: VoiceFileType = VoiceFileType.CHUNK_AUDIO,
         s3Config: AwsS3Configuration? = null,
+        bid: String,
         onResponse: (ResponseState) -> Unit = {},
         retryCount: Int = 0
     ) {
@@ -64,10 +65,10 @@ object AwsS3UploadService {
                             file = file,
                             folderName = folderName,
                             sessionId = sessionId,
-                            isAudio = isAudio,
-                            isFullAudio = isFullAudio,
+                            voiceFileType = voiceFileType,
                             onResponse = onResponse,
-                            retryCount = retryCount + 1
+                            retryCount = retryCount + 1,
+                            bid = bid
                         )
                     }
                 }
@@ -100,11 +101,9 @@ object AwsS3UploadService {
         val key = "$folderName/$sessionId/${fileName}"
 
         val metadata = ObjectMetadata()
-        if (isAudio) {
-            metadata.contentType = "audio/wav"
-        } else {
-            metadata.contentType = "application/json"
-        }
+        metadata.contentType = "audio/wav"
+        metadata.addUserMetadata("bid", bid)
+        metadata.addUserMetadata("txnid", sessionId)
 
         val uploadObserver =
             transferUtility?.upload(config.bucketName, key, file, metadata)
@@ -113,9 +112,15 @@ object AwsS3UploadService {
             override fun onStateChanged(id: Int, state: TransferState?) {
                 when (state) {
                     TransferState.COMPLETED -> {
-                        deleteFile(file, !isFullAudio && isAudio)
+                        deleteFile(file, voiceFileType == VoiceFileType.CHUNK_AUDIO)
                         onResponse(ResponseState.Success(true))
                         uploadListener?.onSuccess(sessionId = sessionId, fileName)
+                        updateFileStatus(
+                            context = context,
+                            fileName = fileName,
+                            sessionId = sessionId,
+                            isUploaded = true
+                        )
                     }
 
                     TransferState.FAILED -> {
@@ -156,6 +161,25 @@ object AwsS3UploadService {
         })
     }
 
+    fun updateFileStatus(
+        context: Context,
+        fileName: String,
+        sessionId: String,
+        isUploaded: Boolean
+    ) {
+        if (repository == null) {
+            repository = VToRxRepository(Voice2RxDatabase.getDatabase(context.applicationContext))
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            repository?.updateVoiceFile(
+                fileId = Voice2RxInternalUtils.getFileIdForSession(
+                    sessionId = sessionId,
+                    fileName = fileName
+                ), isUploaded = isUploaded
+            )
+        }
+    }
+
     suspend fun updateAllSession(context: Context) {
         if (repository == null) {
             repository = VToRxRepository(Voice2RxDatabase.getDatabase(context.applicationContext))
@@ -163,9 +187,9 @@ object AwsS3UploadService {
         withContext(Dispatchers.IO) {
             val sessions = repository?.getAllSessions()
             sessions?.forEach {
-                if (!it.isProcessed) {
-                    readAndUpdateSession(it)
-                }
+//                if (!it.isProcessed) {
+//                    readAndUpdateSession(it)
+//                }
             }
         }
     }
@@ -189,13 +213,13 @@ object AwsS3UploadService {
             val transcript = readFile(Voice2RxInternalUtils.BUCKET_NAME, transcriptPath)
             val structuredRx = readFile(Voice2RxInternalUtils.BUCKET_NAME, structuredRxPath)
 
-            repository?.updateSession(
-                session = session.copy(
-                    transcript = transcript,
-                    structuredRx = structuredRx,
-                    isProcessed = true
-                )
-            )
+//            repository?.updateSession(
+//                session = session.copy(
+//                    transcript = transcript,
+//                    structuredRx = structuredRx,
+//                    isProcessed = true
+//                )
+//            )
         }
     }
 

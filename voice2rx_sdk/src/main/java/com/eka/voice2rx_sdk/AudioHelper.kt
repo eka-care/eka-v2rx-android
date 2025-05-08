@@ -128,7 +128,11 @@ internal class AudioHelper(
             Voice2RxUtils.getCurrentDateInYYMMDD(),
             sessionId,
             shouldUpload = false,
-            onFileCreated = onFileCreated
+            onFileCreated = onFileCreated,
+            fileInfo = FileInfo(
+                st = "0",
+                et = "0"
+            ),
         )
     }
 

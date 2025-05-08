@@ -6,15 +6,16 @@ import kotlinx.coroutines.runBlocking
 
 class OkHttpImpl(
     val ekaAuthConfig: EkaAuthConfig?,
+    val defaultHeaders: Map<String, String> = HashMap(),
     val authorizationToken: String,
 ) : IOkHttpSetup {
     override fun getDefaultHeaders(url: String): Map<String, String> {
         val headers = HashMap<String, String>()
+        headers.putAll(defaultHeaders)
         headers["auth"] = authorizationToken
         headers["Authorization"] = "Bearer $authorizationToken"
-        headers["flavour"] = "android"
-        headers["sdk_version"] = BuildConfig.SDK_VERSION_NAME
-        headers["sdk_build_number"] = BuildConfig.SDK_BUILD_NUMBER
+        headers["flavour"] =
+            "android_${BuildConfig.SDK_VERSION_NAME}_${BuildConfig.SDK_BUILD_NUMBER}"
         return headers
     }
 

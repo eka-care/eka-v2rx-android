@@ -40,8 +40,7 @@ internal class UploadService(
 
                 val clipIndex = currentClipIndex
                 val lastClipIndex = lastClipIndex1
-                if (clipIndex == -1) {
-                } else {
+                if (clipIndex != -1) {
                     clippedAudioData.addAll(
                         audioData.subList(lastClipIndex + 1, clipIndex + 1).map { it.frameData })
 
@@ -86,13 +85,14 @@ internal class UploadService(
         val fileName = "${sessionId + "_" + FILE_INDEX}.m4a"
         val wavFileName = "${sessionId + "_" + FILE_INDEX}.wav"
         val outputFile = File(context.filesDir, fileName)
+        val currentFileInfo = FileInfo(
+            st = audioHelper.getClipTimeFromClipIndex(startIndex),
+            et = audioHelper.getClipTimeFromClipIndex(endIndex)
+        )
 
         onFileUploaded(
             fileName,
-            FileInfo(
-                st = audioHelper.getClipTimeFromClipIndex(startIndex),
-                et = audioHelper.getClipTimeFromClipIndex(endIndex)
-            ),
+            currentFileInfo,
             IncludeStatus.INCLUDED
         )
 
@@ -105,10 +105,11 @@ internal class UploadService(
             context,
             inputFile = File(context.filesDir, wavFileName),
             outputFile = outputFile,
-            audioData,
-            Voice2Rx.getVoice2RxInitConfiguration().sampleRate.value,
-            Voice2RxUtils.getCurrentDateInYYMMDD(),
-            sessionId
+            audioData = audioData,
+            sampleRate = Voice2Rx.getVoice2RxInitConfiguration().sampleRate.value,
+            folderName = Voice2RxUtils.getCurrentDateInYYMMDD(),
+            sessionId = sessionId,
+            fileInfo = currentFileInfo
         )
     }
 }
