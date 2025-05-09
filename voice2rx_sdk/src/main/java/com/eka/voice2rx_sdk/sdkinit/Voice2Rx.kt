@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import com.eka.network.ConverterFactoryType
 import com.eka.network.Networking
 import com.eka.voice2rx_sdk.common.ResponseState
+import com.eka.voice2rx_sdk.common.SessionResponse
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.common.models.VoiceError
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
@@ -187,6 +188,15 @@ object Voice2Rx {
         return v2RxInternal?.getVoice2RxStatus(sessionId) ?: SessionStatus(
             sessionId = sessionId,
             error = Error(code = "NOT_INITIALIZED", message = "Voice2Rx SDK not initialized")
+        )
+    }
+
+    suspend fun getVoiceSessionData(sessionId: String): SessionResponse {
+        if (v2RxInternal == null) {
+            return SessionResponse.Error(Exception("Voice2Rx SDK not initialized"))
+        }
+        return v2RxInternal?.getVoiceSessionData(sessionId = sessionId) ?: SessionResponse.Error(
+            Exception("Voice2Rx SDK not initialized")
         )
     }
 

@@ -9,7 +9,9 @@ data class Voice2RxTransactionResult(
     @SerializedName("data")
     val data: Data?,
     @SerializedName("error")
-    val error: String? = null,
+    val error: List<ResultError?>? = null,
+    @SerializedName("warning")
+    val warning: List<ResultError>? = null,
     @SerializedName("message")
     val message: String? = null,
     @SerializedName("status")
@@ -17,9 +19,26 @@ data class Voice2RxTransactionResult(
 )
 
 @Keep
+data class ResultError(
+    @SerializedName("code")
+    val code: String? = null,
+    @SerializedName("message")
+    val message: String? = null,
+)
+
+@Keep
 enum class Voice2RxStatus {
     @SerializedName("in-progress")
     IN_PROGRESS,
+
+    @SerializedName("init")
+    INIT,
+
+    @SerializedName("stop")
+    STOP,
+
+    @SerializedName("commit")
+    COMMIT,
 
     @SerializedName("success")
     SUCCESS,

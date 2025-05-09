@@ -1,10 +1,14 @@
 package com.eka.voice2rx_sdk.data.repositories
 
+import android.content.Context
 import android.util.Log
 import com.eka.network.ConverterFactoryType
 import com.eka.network.Networking
 import com.eka.voice2rx.data.remote.models.AwsS3ConfigResponse
 import com.eka.voice2rx_sdk.BuildConfig
+import com.eka.voice2rx_sdk.common.ResponseState
+import com.eka.voice2rx_sdk.common.Voice2RxInternalUtils
+import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
@@ -12,19 +16,28 @@ import com.eka.voice2rx_sdk.data.local.db.entities.VoiceFile
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceFileType
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceTransactionStage
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceTransactionState
+import com.eka.voice2rx_sdk.data.local.db.entities.VoiceTranscriptionOutput
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
 import com.eka.voice2rx_sdk.data.remote.models.requests.Voice2RxInitTransactionRequest
 import com.eka.voice2rx_sdk.data.remote.models.requests.Voice2RxStopTransactionRequest
 import com.eka.voice2rx_sdk.data.remote.models.responses.Voice2RxInitTransactionResponse
 import com.eka.voice2rx_sdk.data.remote.models.responses.Voice2RxStopTransactionResponse
 import com.eka.voice2rx_sdk.data.remote.models.responses.Voice2RxTransactionResult
+import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
 import com.eka.voice2rx_sdk.data.remote.services.Voice2RxService
+import com.eka.voice2rx_sdk.sdkinit.AwsS3Configuration
+import com.eka.voice2rx_sdk.sdkinit.Voice2Rx
 import com.google.gson.Gson
 import com.haroldadmin.cnradapter.NetworkResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 internal class VToRxRepository(
     private val vToRxDatabase: Voice2RxDatabase
@@ -137,7 +150,7 @@ internal class VToRxRepository(
                     audioFiles = voiceFiles.filter { it.fileType == VoiceFileType.CHUNK_AUDIO }
                         .map { it.fileName }
                         .toList(),
-                    chunksInfo = null
+                    chunksInfo = Voice2RxInternalUtils.getFileInfoFromVoiceFileList(voiceFiles = voiceFiles)
                 )
             )
         }
@@ -163,7 +176,7 @@ internal class VToRxRepository(
                         audioFiles = voiceFiles.filter { it.fileType == VoiceFileType.CHUNK_AUDIO }
                             .map { it.fileName }
                             .toList(),
-                        chunksInfo = null
+                        chunksInfo = emptyList()
                     )
                 )
             } else {
@@ -200,11 +213,73 @@ internal class VToRxRepository(
     suspend fun getVoice2RxStatus(sessionId: String): NetworkResponse<Voice2RxTransactionResult, Voice2RxTransactionResult> {
         return withContext(Dispatchers.IO) {
             try {
-                goToCommitStep(sessionId = sessionId)
+                checkUploadingStageAndProgress(sessionId = sessionId)
                 val response = remoteDataSource.getVoice2RxTransactionResult(sessionId = sessionId)
+                if (response is NetworkResponse.Success) {
+                    saveSessionOutput(sessionId = sessionId, result = response.body)
+                }
                 response
             } catch (e: Exception) {
                 NetworkResponse.UnknownError(error = e, response = null)
+            }
+        }
+    }
+
+    fun saveSessionOutput(sessionId: String, result: Voice2RxTransactionResult) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                result.data?.output?.forEachIndexed { idx, it ->
+                    it?.let { output ->
+                        vToRxDatabase.getVoice2RxDao().insertTranscriptionOutput(
+                            VoiceTranscriptionOutput(
+                                outputId = Voice2RxInternalUtils.getOutputId(
+                                    sessionId = sessionId,
+                                    templateId = output.templateId?.value ?: idx.toString()
+                                ),
+                                foreignKey = sessionId,
+                                name = output.name,
+                                templateId = output.templateId,
+                                type = output.type,
+                                value = output.value
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("Voice2Rx", "Error saving session output: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun getSessionOutput(sessionId: String): List<VoiceTranscriptionOutput> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val session =
+                    vToRxDatabase.getVoice2RxDao().getOutputsBySessionId(sessionId = sessionId)
+                session
+            } catch (_: Exception) {
+                emptyList<VoiceTranscriptionOutput>()
+            }
+        }
+    }
+
+    fun listenToAllFilesForSession(sessionId: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                vToRxDatabase.getVoice2RxDao().getAllFilesFlow(sessionId = sessionId)
+                    .collectLatest {
+                        val files = it.filter { file -> file.fileType == VoiceFileType.CHUNK_AUDIO }
+                        if (files.isNotEmpty()) {
+                            val isAllUploaded = files.all { file -> file.isUploaded }
+                            if (isAllUploaded) {
+                                checkUploadingStageAndProgress(sessionId = sessionId)
+                            } else {
+                                VoiceLogger.w("Voice2Rx", "Not all audio files are uploaded")
+                            }
+                        }
+                    }
+            } catch (e: Exception) {
+                VoiceLogger.e("Voice2Rx", "Error listening to all files for session: ${e.message}")
             }
         }
     }
@@ -337,91 +412,94 @@ internal class VToRxRepository(
         }
     }
 
-    //TODO
+    fun retrySessionUploading(
+        context: Context,
+        sessionId: String,
+        s3Config: AwsS3Configuration?,
+        onResponse: (ResponseState) -> Unit,
+    ) {
+        if (!Voice2RxUtils.isNetworkAvailable(context)) {
+            onResponse(ResponseState.Error("Network not available!"))
+            return
+        }
+        if (s3Config == null) {
+            onResponse(ResponseState.Error("Credentials not available!"))
+            return
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            val session = getSessionBySessionId(sessionId = sessionId)
+            val sessionFiles = getAllFiles(sessionId = sessionId)
+            try {
+                val results = sessionFiles
+                    .map { file ->
+                        uploadFileFlow(
+                            voiceFile = file,
+                            createdAt = session?.createdAt ?: 0L,
+                            sessionId = sessionId,
+                            s3Config = s3Config,
+                            context = context
+                        )
+                            .toList()
+                    }.flatten()
 
-//    fun retrySessionUploading(
-//        context : Context,
-//        sessionId : String,
-//        s3Config : AwsS3Configuration?,
-//        onResponse : (ResponseState) -> Unit,
-//    ) {
-//        if(!Voice2RxUtils.isNetworkAvailable(context)) {
-//            onResponse(ResponseState.Error("Network not available!"))
-//            return
-//        }
-//        if(s3Config == null) {
-//            onResponse(ResponseState.Error("Credentials not available!"))
-//            return
-//        }
-//        CoroutineScope(Dispatchers.IO).launch {
-//            val session = getSessionBySessionId(sessionId = sessionId)
-//            try {
-//                val results = session?.filePaths
-//                    ?.map { filePath ->
-//                        uploadFileFlow(filePath, session.createdAt, sessionId, s3Config, context)
-//                            .toList()
-//                    }?.flatten()
-//
-//                if(results != null && results.all { it }) {
-//                    onResponse(ResponseState.Success(true))
-//                } else {
-//                    onResponse(ResponseState.Error("Audio file upload failed!"))
-//                }
-//            } catch (error : Exception) {
-//                onResponse(ResponseState.Error(error?.message ?: "Something went wrong!"))
-//            }
-//        }
-//    }
-//
-//    fun uploadFileFlow(
-//        filePath: String,
-//        createdAt: Long,
-//        sessionId: String,
-//        s3Config: AwsS3Configuration,
-//        context: Context
-//    ) = callbackFlow {
-//        if (!Voice2RxUtils.isNetworkAvailable(context)) {
-//            trySend(false)
-//            close()
-//            return@callbackFlow
-//        }
-//
-//        val file = File(context.filesDir, filePath)
-//        if (!file.exists()) {
-//            VoiceLogger.e("Retry Session", "File Not Found!")
-//            trySend(true)
-//            close()
-//            return@callbackFlow
-//        }
-//
-//        try {
-//            AwsS3UploadService.uploadFileToS3(
-//                context = context,
-//                fileName = filePath.split("_").last(),
-//                folderName = Voice2RxUtils.getTimeStampInYYMMDD(createdAt),
-//                file = file,
-//                sessionId = sessionId,
-//                isAudio = isAudioFile(filePath),
-//                s3Config = s3Config,
-//                onResponse = { response ->
-//                    if(response is ResponseState.Success && response.isCompleted) {
-//                        trySend(true)
-//                    } else {
-//                        trySend(false)
-//                    }
-//                    close()
-//                }
-//            )
-//        } catch (e: Exception) {
-//            VoiceLogger.e("Retry Session", "Upload failed: ${e.message}")
-//            trySend(false)
-//            close()
-//        }
-//
-//        awaitClose {}
-//    }
+                if (results.all { it }) {
+                    checkUploadingStageAndProgress(sessionId = sessionId)
+                    onResponse(ResponseState.Success(true))
+                } else {
+                    onResponse(ResponseState.Error("Audio file upload failed!"))
+                }
+            } catch (error: Exception) {
+                onResponse(ResponseState.Error(error?.message ?: "Something went wrong!"))
+            }
+        }
+    }
 
-    private fun isAudioFile(fileName : String) : Boolean {
-        return !fileName.lowercase().endsWith(".json")
+    fun uploadFileFlow(
+        voiceFile: VoiceFile,
+        createdAt: Long,
+        sessionId: String,
+        s3Config: AwsS3Configuration,
+        context: Context
+    ) = callbackFlow {
+        if (!Voice2RxUtils.isNetworkAvailable(context)) {
+            trySend(false)
+            close()
+            return@callbackFlow
+        }
+
+        val file = File(context.filesDir, voiceFile.filePath)
+        if (!file.exists()) {
+            VoiceLogger.e("Retry Session", "File Not Found!")
+            trySend(true)
+            close()
+            return@callbackFlow
+        }
+
+        try {
+            AwsS3UploadService.uploadFileToS3(
+                context = context,
+                fileName = voiceFile.fileName,
+                folderName = Voice2RxUtils.getTimeStampInYYMMDD(createdAt),
+                file = file,
+                sessionId = sessionId,
+                voiceFileType = VoiceFileType.CHUNK_AUDIO,
+                s3Config = s3Config,
+                bid = Voice2RxInternalUtils.getUserTokenData(Voice2Rx.getVoice2RxInitConfiguration().authorizationToken)?.businessId.toString(),
+                onResponse = { response ->
+                    if (response is ResponseState.Success && response.isCompleted) {
+                        trySend(true)
+                    } else {
+                        trySend(false)
+                    }
+                    close()
+                }
+            )
+        } catch (e: Exception) {
+            VoiceLogger.e("Retry Session", "Upload failed: ${e.message}")
+            trySend(false)
+            close()
+        }
+
+        awaitClose {}
     }
 }

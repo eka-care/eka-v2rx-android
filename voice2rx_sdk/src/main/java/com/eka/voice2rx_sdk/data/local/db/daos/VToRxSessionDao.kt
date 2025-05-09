@@ -11,7 +11,9 @@ import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceFile
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceTransactionStage
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceTransactionState
+import com.eka.voice2rx_sdk.data.local.db.entities.VoiceTranscriptionOutput
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface VToRxSessionDao {
@@ -50,4 +52,13 @@ interface VToRxSessionDao {
 
     @Query("SELECT * FROM ${DatabaseConstants.V2RX_VOICE_FILE_TABLE_NAME} WHERE foreign_key = :sessionId")
     suspend fun getAllFiles(sessionId: String): List<VoiceFile>
+
+    @Query("SELECT * FROM ${DatabaseConstants.V2RX_VOICE_FILE_TABLE_NAME} WHERE foreign_key = :sessionId")
+    fun getAllFilesFlow(sessionId: String): Flow<List<VoiceFile>>
+
+    @Insert(entity = VoiceTranscriptionOutput::class, onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTranscriptionOutput(transcriptionOutput: VoiceTranscriptionOutput)
+
+    @Query("SELECT * FROM ${DatabaseConstants.V2RX_VOICE_TRANSCRIPTION_OUTPUT} WHERE foreign_key = :sessionId")
+    suspend fun getOutputsBySessionId(sessionId: String): List<VoiceTranscriptionOutput>
 }

@@ -15,4 +15,10 @@ object VoiceLogger {
             Log.e(tag, msg)
         }
     }
+
+    fun w(tag: String, msg: String) {
+        if (BuildConfig.DEBUG) {
+            Log.w(tag, msg)
+        }
+    }
 }

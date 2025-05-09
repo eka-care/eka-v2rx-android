@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
+import android.util.Base64
 import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -59,6 +60,14 @@ object Voice2RxUtils {
 
     fun getFilePath(context: Context, sessionId : String) : String {
         return context.applicationContext.filesDir.absolutePath + "/" + getFullRecordingFileName(sessionId)
+    }
+
+    fun convertBase64IntoString(base64: String?): String {
+        if (base64 == null) {
+            return ""
+        }
+        val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
+        return String(decodedBytes, Charsets.UTF_8)
     }
 
     fun isNetworkAvailable(context: Context): Boolean {

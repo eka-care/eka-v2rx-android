@@ -9,5 +9,7 @@ data class Voice2RxStopTransactionResponse(
     @SerializedName("message")
     var message: String?,
     @SerializedName("status")
-    var status: String?
+    var status: String?,
+    @SerializedName("error")
+    var error: String?,
 )
