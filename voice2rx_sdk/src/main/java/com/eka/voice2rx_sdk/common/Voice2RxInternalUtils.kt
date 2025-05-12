@@ -1,6 +1,7 @@
 package com.eka.voice2rx_sdk.common
 
 import androidx.annotation.Keep
+import com.eka.voice2rx_sdk.common.voicelogger.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceFile
 import com.eka.voice2rx_sdk.data.remote.models.requests.ChunkData
@@ -29,6 +30,9 @@ internal object Voice2RxInternalUtils {
     }
 
     fun getFileInfoFromVoiceFileList(voiceFiles: List<VoiceFile>): List<Map<String, ChunkData>> {
+        if (voiceFiles.isEmpty()) {
+            return emptyList()
+        }
         return voiceFiles.map { file ->
             val start = file.startTime.toDoubleOrNull()
             val end = file.endTime.toDoubleOrNull()

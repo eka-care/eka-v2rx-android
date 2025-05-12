@@ -9,7 +9,9 @@ import com.eka.voice2rx_sdk.BuildConfig
 import com.eka.voice2rx_sdk.common.ResponseState
 import com.eka.voice2rx_sdk.common.Voice2RxInternalUtils
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
-import com.eka.voice2rx_sdk.common.VoiceLogger
+import com.eka.voice2rx_sdk.common.voicelogger.EventCode
+import com.eka.voice2rx_sdk.common.voicelogger.EventLog
+import com.eka.voice2rx_sdk.common.voicelogger.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceFile
@@ -37,6 +39,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 
 internal class VToRxRepository(
@@ -57,9 +60,20 @@ internal class VToRxRepository(
     ): NetworkResponse<Voice2RxInitTransactionResponse, Voice2RxInitTransactionResponse> {
         return withContext(Dispatchers.IO) {
             try {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "init",
+                            )
+                        )
+                    )
+                )
                 val response =
                     remoteDataSource.initTransaction(sessionId = sessionId, request = request)
-                Log.d(
+                VoiceLogger.d(
                     "Voice2Rx",
                     "Init Transaction: $sessionId request: $request response : $response"
                 )
@@ -72,6 +86,18 @@ internal class VToRxRepository(
                 }
                 response
             } catch (e: Exception) {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_ERROR,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "commit",
+                                "error" to "Error initializing transaction: ${e.message}",
+                            )
+                        )
+                    )
+                )
                 NetworkResponse.UnknownError(error = e, response = null)
             }
         }
@@ -83,9 +109,20 @@ internal class VToRxRepository(
     ): NetworkResponse<Voice2RxStopTransactionResponse, Voice2RxStopTransactionResponse> {
         return withContext(Dispatchers.IO) {
             try {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "stop",
+                            )
+                        )
+                    )
+                )
                 val response =
                     remoteDataSource.stopTransaction(sessionId = sessionId, request = request)
-                Log.d(
+                VoiceLogger.d(
                     "Voice2Rx",
                     "Stop Transaction: $sessionId request: $request response : $response"
                 )
@@ -98,6 +135,18 @@ internal class VToRxRepository(
                 }
                 response
             } catch (e: Exception) {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_ERROR,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "commit",
+                                "error" to "Error stopping transaction: ${e.message}",
+                            )
+                        )
+                    )
+                )
                 NetworkResponse.UnknownError(error = e, response = null)
             }
         }
@@ -144,6 +193,25 @@ internal class VToRxRepository(
     private fun goToStopStep(sessionId: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val voiceFiles = getAllFiles(sessionId = sessionId)
+            if (voiceFiles.isEmpty()) {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_ERROR,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "stop",
+                                "error" to "No audio files found for session: $sessionId",
+                            )
+                        )
+                    )
+                )
+                updateSessionUploadStage(
+                    sessionId = sessionId,
+                    uploadStage = VoiceTransactionStage.ERROR
+                )
+                return@launch
+            }
             stopVoice2RxTransaction(
                 sessionId = sessionId,
                 request = Voice2RxStopTransactionRequest(
@@ -167,6 +235,21 @@ internal class VToRxRepository(
                 return@launch
             }
             val voiceFiles = getAllFiles(sessionId = sessionId)
+            if (voiceFiles.isEmpty()) {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_ERROR,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "commit",
+                                "error" to "No audio files found for session: $sessionId",
+                            )
+                        )
+                    )
+                )
+                return@launch
+            }
             val isAllUploaded =
                 voiceFiles.filter { it.fileType == VoiceFileType.CHUNK_AUDIO }.all { it.isUploaded }
             if (isAllUploaded) {
@@ -191,9 +274,20 @@ internal class VToRxRepository(
     ): NetworkResponse<Voice2RxStopTransactionResponse, Voice2RxStopTransactionResponse> {
         return withContext(Dispatchers.IO) {
             try {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "commit",
+                            )
+                        )
+                    )
+                )
                 val response =
                     remoteDataSource.commitTransaction(sessionId = sessionId, request = request)
-                Log.d(
+                VoiceLogger.d(
                     "Voice2Rx",
                     "Commit Transaction: $sessionId request: $request response : $response"
                 )
@@ -205,6 +299,18 @@ internal class VToRxRepository(
                 }
                 response
             } catch (e: Exception) {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_ERROR,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "commit",
+                                "error" to "Error committing transaction: ${e.message}",
+                            )
+                        )
+                    )
+                )
                 NetworkResponse.UnknownError(error = e, response = null)
             }
         }
@@ -217,9 +323,34 @@ internal class VToRxRepository(
                 val response = remoteDataSource.getVoice2RxTransactionResult(sessionId = sessionId)
                 if (response is NetworkResponse.Success) {
                     saveSessionOutput(sessionId = sessionId, result = response.body)
+                } else if (response is NetworkResponse.Error) {
+                    Voice2Rx.logEvent(
+                        EventLog.Info(
+                            code = EventCode.VOICE2RX_SESSION_STATUS,
+                            params = JSONObject(
+                                mapOf(
+                                    "sessionId" to sessionId,
+                                    "lifecycle_event" to "status_error",
+                                    "error" to "Error getting session status: ${response.body.toString()} :: ${response.error.toString()}",
+                                )
+                            )
+                        )
+                    )
                 }
                 response
             } catch (e: Exception) {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_ERROR,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle_event" to "get_session_status",
+                                "error" to "Error getting session status: ${e.message}",
+                            )
+                        )
+                    )
+                )
                 NetworkResponse.UnknownError(error = e, response = null)
             }
         }
@@ -266,6 +397,17 @@ internal class VToRxRepository(
     fun listenToAllFilesForSession(sessionId: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "lifecycle" to "listen_to_all_files",
+                            )
+                        )
+                    )
+                )
                 vToRxDatabase.getVoice2RxDao().getAllFilesFlow(sessionId = sessionId)
                     .collectLatest {
                         val files = it.filter { file -> file.fileType == VoiceFileType.CHUNK_AUDIO }
@@ -279,6 +421,17 @@ internal class VToRxRepository(
                         }
                     }
             } catch (e: Exception) {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_ERROR,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to sessionId,
+                                "error" to "Error listening to all files for session: ${e.message}",
+                            )
+                        )
+                    )
+                )
                 VoiceLogger.e("Voice2Rx", "Error listening to all files for session: ${e.message}")
             }
         }
@@ -288,8 +441,18 @@ internal class VToRxRepository(
         withContext(Dispatchers.IO) {
             try {
                 vToRxDatabase.getVoice2RxDao().insertSession(session = session)
-            }
-            catch (_ : Exception) {
+            } catch (e: Exception) {
+                Voice2Rx.logEvent(
+                    EventLog.Info(
+                        code = EventCode.VOICE2RX_SESSION_ERROR,
+                        params = JSONObject(
+                            mapOf(
+                                "sessionId" to session.sessionId,
+                                "error" to "Error inserting session: ${e.message}",
+                            )
+                        )
+                    )
+                )
             }
         }
     }
@@ -298,7 +461,16 @@ internal class VToRxRepository(
         withContext(Dispatchers.IO) {
             try {
                 vToRxDatabase.getVoice2RxDao().insertVoiceFile(voiceFile = voiceFile)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                EventLog.Info(
+                    code = EventCode.VOICE2RX_SESSION_ERROR,
+                    params = JSONObject(
+                        mapOf(
+                            "sessionId" to voiceFile.foreignKey,
+                            "error" to "Error inserting voice file: ${e.message}",
+                        )
+                    )
+                )
             }
         }
     }
@@ -308,7 +480,16 @@ internal class VToRxRepository(
             try {
                 vToRxDatabase.getVoice2RxDao()
                     .updateVoiceFile(fileId = fileId, isUploaded = isUploaded)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                EventLog.Info(
+                    code = EventCode.VOICE2RX_SESSION_ERROR,
+                    params = JSONObject(
+                        mapOf(
+                            "fileId" to fileId,
+                            "error" to "Error updating voice file: ${e.message}",
+                        )
+                    )
+                )
             }
         }
     }
@@ -318,7 +499,16 @@ internal class VToRxRepository(
             try {
                 val files = vToRxDatabase.getVoice2RxDao().getAllFiles(sessionId = sessionId)
                 files
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                EventLog.Info(
+                    code = EventCode.VOICE2RX_SESSION_ERROR,
+                    params = JSONObject(
+                        mapOf(
+                            "sessionId" to sessionId,
+                            "error" to "Error getting all files: ${e.message}",
+                        )
+                    )
+                )
                 emptyList<VoiceFile>()
             }
         }
@@ -407,6 +597,14 @@ internal class VToRxRepository(
                 val response = remoteDataSource.getS3Config(url)
                 response
             } catch (e: Exception) {
+                EventLog.Info(
+                    code = EventCode.VOICE2RX_SESSION_ERROR,
+                    params = JSONObject(
+                        mapOf(
+                            "error" to "Error getting S3 config: ${e.message}",
+                        )
+                    )
+                )
                 NetworkResponse.UnknownError(error = e, response = null)
             }
         }
@@ -427,6 +625,16 @@ internal class VToRxRepository(
             return
         }
         CoroutineScope(Dispatchers.IO).launch {
+            EventLog.Info(
+                code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                params = JSONObject(
+                    mapOf(
+                        "sessionId" to sessionId,
+                        "lifecycle_event" to "retry_upload",
+                        "status" to "started",
+                    )
+                )
+            )
             val session = getSessionBySessionId(sessionId = sessionId)
             val sessionFiles = getAllFiles(sessionId = sessionId)
             try {
@@ -434,9 +642,9 @@ internal class VToRxRepository(
                     .map { file ->
                         uploadFileFlow(
                             voiceFile = file,
+                            bid = session?.bid ?: "",
                             createdAt = session?.createdAt ?: 0L,
                             sessionId = sessionId,
-                            s3Config = s3Config,
                             context = context
                         )
                             .toList()
@@ -449,6 +657,17 @@ internal class VToRxRepository(
                     onResponse(ResponseState.Error("Audio file upload failed!"))
                 }
             } catch (error: Exception) {
+                EventLog.Info(
+                    code = EventCode.VOICE2RX_SESSION_ERROR,
+                    params = JSONObject(
+                        mapOf(
+                            "sessionId" to sessionId,
+                            "lifecycle_event" to "retry_upload",
+                            "status" to "error",
+                            "error" to "Error uploading files: ${error.message}",
+                        )
+                    )
+                )
                 onResponse(ResponseState.Error(error?.message ?: "Something went wrong!"))
             }
         }
@@ -456,9 +675,9 @@ internal class VToRxRepository(
 
     fun uploadFileFlow(
         voiceFile: VoiceFile,
+        bid: String,
         createdAt: Long,
         sessionId: String,
-        s3Config: AwsS3Configuration,
         context: Context
     ) = callbackFlow {
         if (!Voice2RxUtils.isNetworkAvailable(context)) {
@@ -483,8 +702,7 @@ internal class VToRxRepository(
                 file = file,
                 sessionId = sessionId,
                 voiceFileType = VoiceFileType.CHUNK_AUDIO,
-                s3Config = s3Config,
-                bid = Voice2RxInternalUtils.getUserTokenData(Voice2Rx.getVoice2RxInitConfiguration().authorizationToken)?.businessId.toString(),
+                bid = bid,
                 onResponse = { response ->
                     if (response is ResponseState.Success && response.isCompleted) {
                         trySend(true)

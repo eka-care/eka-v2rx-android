@@ -21,8 +21,7 @@ data class VToRxSession(
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "full_audio_path") val fullAudioPath : String,
     @ColumnInfo(name = "owner_id") val ownerId : String,
-    @ColumnInfo(name = "caller_id") val callerId : String,
-    @ColumnInfo(name = "patient_id") val patientId : String,
+    @ColumnInfo(name = "bid") val bid: String,
     @ColumnInfo(name = "mode") val mode : Voice2RxType,
     @ColumnInfo(name = "session_metadata") val sessionMetadata: String? = null,
     @ColumnInfo(name = "voice_transaction_state") val voiceTransactionState: VoiceTransactionState = VoiceTransactionState.STARTED,
@@ -40,6 +39,9 @@ data class VToRxSession(
             childColumns = ["foreign_key"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    indices = [
+        androidx.room.Index(value = ["foreign_key"]),
     ]
 )
 data class VoiceFile(
@@ -63,6 +65,9 @@ data class VoiceFile(
             childColumns = ["foreign_key"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    indices = [
+        androidx.room.Index(value = ["foreign_key"]),
     ]
 )
 data class VoiceTranscriptionOutput(
@@ -103,4 +108,5 @@ enum class VoiceTransactionStage {
     STOP,
     COMMIT,
     COMPLETED,
+    ERROR
 }

@@ -2,7 +2,7 @@ package com.eka.voice2rx_sdk
 
 import android.content.Context
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
-import com.eka.voice2rx_sdk.common.VoiceLogger
+import com.eka.voice2rx_sdk.common.voicelogger.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.models.FileInfo
 import com.eka.voice2rx_sdk.data.local.models.IncludeStatus
 import com.eka.voice2rx_sdk.sdkinit.V2RxInternal

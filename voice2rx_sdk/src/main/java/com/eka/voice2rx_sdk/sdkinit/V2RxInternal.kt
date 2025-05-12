@@ -10,8 +10,10 @@ import com.eka.voice2rx_sdk.common.SessionResponse
 import com.eka.voice2rx_sdk.common.UploadListener
 import com.eka.voice2rx_sdk.common.Voice2RxInternalUtils
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
-import com.eka.voice2rx_sdk.common.VoiceLogger
 import com.eka.voice2rx_sdk.common.models.VoiceError
+import com.eka.voice2rx_sdk.common.voicelogger.EventCode
+import com.eka.voice2rx_sdk.common.voicelogger.EventLog
+import com.eka.voice2rx_sdk.common.voicelogger.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.Voice2RxDatabase
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceFile
@@ -46,6 +48,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 
 internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener {
@@ -74,7 +77,6 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
                 folderName = folderName,
                 sessionId = sessionId,
                 voiceFileType = voiceFileType,
-                s3Config = s3Config,
                 onResponse = onResponse,
                 bid = Voice2RxInternalUtils.getUserTokenData(sessionToken = Voice2Rx.getVoice2RxInitConfiguration().authorizationToken)?.businessId.toString(),
             )
@@ -102,7 +104,10 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
                     }
 
                     is NetworkResponse.Error -> {
-                        Voice2Rx.getVoice2RxInitConfiguration().onError.invoke("", VoiceError.CREDENTIAL_NOT_VALID)
+                        Voice2Rx.getVoice2RxInitConfiguration().voice2RxLifecycle.onError(
+                            "",
+                            VoiceError.CREDENTIAL_NOT_VALID
+                        )
                         VoiceLogger.e(TAG, "Error getting S3 Config")
                         onResponse(false)
                     }
@@ -210,10 +215,12 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
 
     var currentlySelectedLanguage: List<SupportedLanguages> = listOf()
     var currentlySelectedOutputFormat: List<TemplateId> = listOf()
+    var currentAdditionalData: AdditionalData? = null
 
     fun startRecording(
         mode: Voice2RxType = Voice2RxType.DICTATION,
         session: String = Voice2RxUtils.generateNewSessionId(),
+        additionalData: AdditionalData?,
         outputFormats: List<TemplateId> = listOf(
             TemplateId.CLINICAL_NOTE_TEMPLATE,
             TemplateId.TRANSCRIPT_TEMPLATE
@@ -225,9 +232,24 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
     ) {
         coroutineScope.launch {
             if(!Voice2RxUtils.isRecordAudioPermissionGranted(app)) {
-                Voice2Rx.getVoice2RxInitConfiguration().onError.invoke(session, VoiceError.MICROPHONE_PERMISSION_NOT_GRANTED)
+                Voice2Rx.getVoice2RxInitConfiguration().voice2RxLifecycle.onError(
+                    session,
+                    VoiceError.MICROPHONE_PERMISSION_NOT_GRANTED
+                )
                 return@launch
             }
+            Voice2Rx.logEvent(
+                EventLog.Info(
+                    code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                    params = JSONObject(
+                        mapOf(
+                            "sessionId" to session,
+                            "lifecycle" to "session started"
+                        )
+                    )
+                )
+            )
+            currentAdditionalData = additionalData
             currentlySelectedLanguage = languages
             currentlySelectedOutputFormat = outputFormats
             currentMode = mode
@@ -268,21 +290,54 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
             chunksInfo = mutableMapOf<String, FileInfo>()
             recorder.start(app, fullRecordingFile, vad.sampleRate.value, vad.frameSize.value)
             initVoice2RxTransaction(mode = mode)
-            config.onStart.invoke(sessionId)
+            config.voice2RxLifecycle.onStartSession(sessionId)
         }
     }
 
     fun pauseRecording() {
+        Voice2Rx.logEvent(
+            EventLog.Info(
+                code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                params = JSONObject(
+                    mapOf(
+                        "sessionId" to sessionId,
+                        "lifecycle" to "session paused"
+                    )
+                )
+            )
+        )
         recorder.pauseListening()
     }
 
     fun resumeRecording() {
+        Voice2Rx.logEvent(
+            EventLog.Info(
+                code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                params = JSONObject(
+                    mapOf(
+                        "sessionId" to sessionId,
+                        "lifecycle" to "session resumed"
+                    )
+                )
+            )
+        )
         recorder.resumeListening()
     }
 
     fun stopRecording() {
         VoiceLogger.d(TAG, "Stop Recording")
         coroutineScope.launch {
+            Voice2Rx.logEvent(
+                EventLog.Info(
+                    code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                    params = JSONObject(
+                        mapOf(
+                            "sessionId" to sessionId,
+                            "lifecycle" to "session stopped"
+                        )
+                    )
+                )
+            )
             isRecording = false
             if (::recorder.isInitialized) {
                 recorder.stop()
@@ -356,9 +411,20 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
             if (includeStatus == IncludeStatus.INCLUDED) {
                 addValueToChunksInfo(fileName, fileInfo)
             }
+            Voice2Rx.logEvent(
+                EventLog.Info(
+                    code = EventCode.VOICE2RX_SESSION_LIFECYCLE,
+                    params = JSONObject(
+                        mapOf(
+                            "sessionId" to sessionId,
+                            "lifecycle" to "last file upload completed"
+                        )
+                    )
+                )
+            )
             uploadWholeFileData()
             stopVoiceTransaction()
-            config.onStop.invoke(sessionId, chunksInfo.size)
+            config.voice2RxLifecycle.onStopSession(sessionId, chunksInfo.size)
         }
     }
 
@@ -447,9 +513,8 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
                     createdAt = Voice2RxUtils.getCurrentUTCEpochMillis(),
                     updatedAt = Voice2RxUtils.getCurrentUTCEpochMillis(),
                     fullAudioPath = Voice2RxUtils.getFullRecordingFileName(sessionId = sessionId),
-                    ownerId = Voice2Rx.getVoice2RxInitConfiguration().ownerId,
-                    callerId = Voice2Rx.getVoice2RxInitConfiguration().callerId,
-                    patientId = Voice2Rx.getVoice2RxInitConfiguration().contextData.patient?.id.toString(),
+                    ownerId = "",
+                    bid = Voice2RxInternalUtils.getUserTokenData(Voice2Rx.getVoice2RxInitConfiguration().authorizationToken)?.businessId.toString(),
                     mode = mode,
                     updatedSessionId = sessionId,
                     status = Voice2RxSessionStatus.DRAFT,
@@ -468,6 +533,7 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
                 sessionId = sessionId,
                 updatedState = VoiceTransactionState.STOPPED
             )
+            repository.listenToAllFilesForSession(sessionId = sessionId)
             if (chunksInfo.size == voiceFiles.size) {
                 repository.stopVoice2RxTransaction(
                     sessionId = sessionId,
@@ -531,14 +597,14 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
 
     private fun initVoice2RxTransaction(mode: Voice2RxType) {
         val s3Url = "s3://$bucketName/$folderName/${sessionId}"
-        var visitId = Voice2Rx.getVoice2RxInitConfiguration().contextData.visitid
+        var visitId = currentAdditionalData?.visitid
         if(visitId.isNullOrEmpty()) {
             visitId = sessionId
         }
         val request = Voice2RxInitTransactionRequest(
             additionalData = AdditionalData(
-                doctor = Voice2Rx.getVoice2RxInitConfiguration().contextData.doctor,
-                patient = Voice2Rx.getVoice2RxInitConfiguration().contextData.patient,
+                doctor = currentAdditionalData?.doctor,
+                patient = currentAdditionalData?.patient,
                 visitid = visitId,
             ),
             inputLanguage = currentlySelectedLanguage.map { it.value },
@@ -565,6 +631,6 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
     }
 
     override fun onAudioFocusGone() {
-        Voice2Rx.getVoice2RxInitConfiguration().onPaused(sessionId)
+        Voice2Rx.getVoice2RxInitConfiguration().voice2RxLifecycle.onPauseSession(sessionId)
     }
 }

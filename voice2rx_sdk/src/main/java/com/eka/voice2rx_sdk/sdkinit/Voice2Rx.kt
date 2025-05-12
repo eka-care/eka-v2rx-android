@@ -13,11 +13,15 @@ import com.eka.voice2rx_sdk.common.ResponseState
 import com.eka.voice2rx_sdk.common.SessionResponse
 import com.eka.voice2rx_sdk.common.Voice2RxUtils
 import com.eka.voice2rx_sdk.common.models.VoiceError
+import com.eka.voice2rx_sdk.common.voicelogger.EventCode
+import com.eka.voice2rx_sdk.common.voicelogger.EventLog
+import com.eka.voice2rx_sdk.common.voicelogger.LogInterceptor
 import com.eka.voice2rx_sdk.data.local.db.entities.VToRxSession
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxSessionStatus
 import com.eka.voice2rx_sdk.data.local.models.Voice2RxType
 import com.eka.voice2rx_sdk.data.remote.models.Error
 import com.eka.voice2rx_sdk.data.remote.models.SessionStatus
+import com.eka.voice2rx_sdk.data.remote.models.requests.AdditionalData
 import com.eka.voice2rx_sdk.data.remote.models.requests.SupportedLanguages
 import com.eka.voice2rx_sdk.data.remote.models.responses.TemplateId
 import com.eka.voice2rx_sdk.data.workers.SyncWorker
@@ -27,6 +31,7 @@ import java.util.concurrent.TimeUnit
 object Voice2Rx {
     private var configuration: Voice2RxInitConfig? = null
     private var v2RxInternal : V2RxInternal? = null
+    private var logger: LogInterceptor? = null
 
     fun init(
         config: Voice2RxInitConfig,
@@ -38,6 +43,12 @@ object Voice2Rx {
             throw IllegalStateException("Voice2Rx SDK not initialized with authorization token")
         }
         if (config.ekaAuthConfig == null) {
+            logger?.logEvent(
+                EventLog.Warning(
+                    warningCode = EventCode.VOICE2RX_SESSION_WARNING,
+                    message = "EkaAuthConfig is null. Please provide EkaAuthConfig for refreshing authentication!"
+                )
+            )
             Log.w(
                 "Voice2RxSDK",
                 "EkaAuthConfig is null. Please provide EkaAuthConfig for refreshing authentication!"
@@ -63,6 +74,14 @@ object Voice2Rx {
         v2RxInternal?.initValues(context)
         initialiseWorker(context.applicationContext)
         updateAllSessions()
+    }
+
+    fun setEventLogger(logInterceptor: LogInterceptor) {
+        logger = logInterceptor
+    }
+
+    fun logEvent(eventLog: EventLog) {
+        logger?.logEvent(eventLog)
     }
 
     internal fun updateAllSessions() {
@@ -110,6 +129,7 @@ object Voice2Rx {
     fun startVoice2Rx(
         mode: Voice2RxType = Voice2RxType.DICTATION,
         session: String = Voice2RxUtils.generateNewSessionId(),
+        additionalData: AdditionalData?,
         outputFormats: List<TemplateId> = listOf(
             TemplateId.CLINICAL_NOTE_TEMPLATE,
             TemplateId.TRANSCRIPT_TEMPLATE
@@ -137,6 +157,7 @@ object Voice2Rx {
         }
         v2RxInternal?.startRecording(
             mode = mode,
+            additionalData = additionalData,
             session = session,
             outputFormats = outputFormats,
             languages = languages

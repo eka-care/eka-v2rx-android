@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
-import android.util.Base64
 import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -66,8 +65,10 @@ object Voice2RxUtils {
         if (base64 == null) {
             return ""
         }
-        val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
-        return String(decodedBytes, Charsets.UTF_8)
+        val decodedBytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+        return String(decodedBytes)
+//        val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
+//        return String(decodedBytes, Charsets.UTF_8)
     }
 
     fun isNetworkAvailable(context: Context): Boolean {

@@ -4,7 +4,7 @@ import android.content.Context
 import android.media.MediaPlayer
 import com.eka.voice2rx_sdk.audio_converters.ConversionResult
 import com.eka.voice2rx_sdk.audio_converters.WAVtoM4AConverter
-import com.eka.voice2rx_sdk.common.VoiceLogger
+import com.eka.voice2rx_sdk.common.voicelogger.VoiceLogger
 import com.eka.voice2rx_sdk.data.local.db.entities.VoiceFileType
 import com.eka.voice2rx_sdk.data.local.models.FileInfo
 import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService

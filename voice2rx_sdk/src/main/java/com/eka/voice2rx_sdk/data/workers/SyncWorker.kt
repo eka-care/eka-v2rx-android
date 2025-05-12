@@ -3,7 +3,7 @@ package com.eka.voice2rx_sdk.data.workers
 import android.content.Context
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import com.eka.voice2rx_sdk.common.VoiceLogger
+import com.eka.voice2rx_sdk.common.voicelogger.VoiceLogger
 import com.eka.voice2rx_sdk.sdkinit.Voice2Rx
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

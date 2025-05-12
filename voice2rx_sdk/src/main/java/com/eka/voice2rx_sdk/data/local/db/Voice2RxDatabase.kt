@@ -17,7 +17,7 @@ import com.eka.voice2rx_sdk.data.local.db.entities.VoiceTranscriptionOutput
         VoiceFile::class,
         VoiceTranscriptionOutput::class
     ],
-    version = 5,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Convertor::class)

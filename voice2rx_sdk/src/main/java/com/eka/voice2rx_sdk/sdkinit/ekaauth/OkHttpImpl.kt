@@ -7,7 +7,7 @@ import kotlinx.coroutines.runBlocking
 class OkHttpImpl(
     val ekaAuthConfig: EkaAuthConfig?,
     val defaultHeaders: Map<String, String> = HashMap(),
-    val authorizationToken: String,
+    var authorizationToken: String,
 ) : IOkHttpSetup {
     override fun getDefaultHeaders(url: String): Map<String, String> {
         val headers = HashMap<String, String>()
@@ -26,6 +26,7 @@ class OkHttpImpl(
     override fun refreshAuthToken(url: String): Map<String, String>? {
         return runBlocking {
             val sessionToken = ekaAuthConfig?.refreshToken()
+            authorizationToken = sessionToken ?: authorizationToken
             if (sessionToken.isNullOrBlank()) {
                 null
             } else {
