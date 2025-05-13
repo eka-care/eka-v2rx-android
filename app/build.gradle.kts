@@ -23,11 +23,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -67,9 +69,9 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-//    implementation(libs.eka.network.android) {
-////        exclude(group = "com.google.protobuf", module = "protobuf-java")
-//    }
+    implementation(libs.eka.network.android) {
+//        exclude(group = "com.google.protobuf", module = "protobuf-java")
+    }
     implementation(libs.google.gson)
     implementation(libs.okhttp)
     implementation(libs.okhttp.urlconnection)
