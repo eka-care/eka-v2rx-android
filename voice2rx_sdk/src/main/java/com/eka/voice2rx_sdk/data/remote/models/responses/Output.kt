@@ -20,7 +20,6 @@ data class Output(
 enum class TemplateId(val value: String) {
     @SerializedName("eka_emr_template")
     EKA_EMR_TEMPLATE("eka_emr_template"),
-
     @SerializedName("clinical_notes_template")
     CLINICAL_NOTE_TEMPLATE("clinical_notes_template"),
     @SerializedName("transcript_template")
