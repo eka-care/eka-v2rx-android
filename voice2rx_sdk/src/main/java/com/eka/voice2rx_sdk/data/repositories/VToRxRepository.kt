@@ -635,6 +635,10 @@ internal class VToRxRepository(
                 )
             )
             val session = getSessionBySessionId(sessionId = sessionId)
+            if (session?.uploadStage == VoiceTransactionStage.ERROR) {
+                onResponse(ResponseState.Error("Session Error!"))
+                return@launch
+            }
             val sessionFiles = getAllFiles(sessionId = sessionId)
             try {
                 val results = sessionFiles
