@@ -210,6 +210,13 @@ object AwsS3UploadService {
         }
         withContext(Dispatchers.IO) {
             val sessions = repository?.getAllSessions()
+            sessions?.forEach {
+                repository?.retrySessionUploading(
+                    context = context,
+                    sessionId = it.sessionId,
+                    onResponse = {}
+                )
+            }
         }
     }
 

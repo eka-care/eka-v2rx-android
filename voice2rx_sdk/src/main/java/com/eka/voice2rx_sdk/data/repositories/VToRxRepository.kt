@@ -27,7 +27,6 @@ import com.eka.voice2rx_sdk.data.remote.models.responses.Voice2RxStopTransaction
 import com.eka.voice2rx_sdk.data.remote.models.responses.Voice2RxTransactionResult
 import com.eka.voice2rx_sdk.data.remote.services.AwsS3UploadService
 import com.eka.voice2rx_sdk.data.remote.services.Voice2RxService
-import com.eka.voice2rx_sdk.sdkinit.AwsS3Configuration
 import com.eka.voice2rx_sdk.sdkinit.Voice2Rx
 import com.google.gson.Gson
 import com.haroldadmin.cnradapter.NetworkResponse
@@ -612,15 +611,10 @@ internal class VToRxRepository(
     fun retrySessionUploading(
         context: Context,
         sessionId: String,
-        s3Config: AwsS3Configuration?,
         onResponse: (ResponseState) -> Unit,
     ) {
         if (!Voice2RxUtils.isNetworkAvailable(context)) {
             onResponse(ResponseState.Error("Network not available!"))
-            return
-        }
-        if (s3Config == null) {
-            onResponse(ResponseState.Error("Credentials not available!"))
             return
         }
         CoroutineScope(Dispatchers.IO).launch {
@@ -637,6 +631,10 @@ internal class VToRxRepository(
             val session = getSessionBySessionId(sessionId = sessionId)
             if (session?.uploadStage == VoiceTransactionStage.ERROR) {
                 onResponse(ResponseState.Error("Session Error!"))
+                return@launch
+            }
+            if (session?.uploadStage == VoiceTransactionStage.COMPLETED) {
+                onResponse(ResponseState.Error("Session already completed!"))
                 return@launch
             }
             val sessionFiles = getAllFiles(sessionId = sessionId)

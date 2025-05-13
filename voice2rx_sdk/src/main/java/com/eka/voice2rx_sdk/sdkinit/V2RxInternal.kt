@@ -478,7 +478,6 @@ internal class V2RxInternal : AudioCallback, UploadListener, AudioFocusListener 
             repository.retrySessionUploading(
                 context = context,
                 sessionId = sessionId,
-                s3Config = s3Config,
                 onResponse = onResponse
             )
         }

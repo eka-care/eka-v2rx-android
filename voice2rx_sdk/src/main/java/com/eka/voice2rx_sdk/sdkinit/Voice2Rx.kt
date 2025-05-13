@@ -88,7 +88,7 @@ object Voice2Rx {
     }
 
     private fun initialiseWorker(context: Context) {
-        val workRequest = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.SECONDS)
+        val workRequest = PeriodicWorkRequestBuilder<SyncWorker>(30, TimeUnit.SECONDS)
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
