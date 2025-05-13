@@ -12,7 +12,6 @@ class OkHttpImpl(
     override fun getDefaultHeaders(url: String): Map<String, String> {
         val headers = HashMap<String, String>()
         headers.putAll(defaultHeaders)
-        headers["auth"] = authorizationToken
         headers["Authorization"] = "Bearer $authorizationToken"
         headers["flavour"] =
             "android_${BuildConfig.SDK_VERSION_NAME}_${BuildConfig.SDK_BUILD_NUMBER}"
