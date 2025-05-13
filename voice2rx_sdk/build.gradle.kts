@@ -112,7 +112,7 @@ dependencies {
     kapt(libs.room.compiler)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    api(libs.eka.network.android)
+    implementation(libs.eka.network.android)
     implementation(libs.google.gson)
     implementation(libs.okhttp)
     implementation(libs.okhttp.urlconnection)

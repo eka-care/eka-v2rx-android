@@ -62,7 +62,6 @@ object Voice2Rx {
             )
             Networking.init(
                 baseUrl = "https://cog.eka.care/",
-                curlLoggingEnabled = true,
                 okHttpSetup = okHttp,
                 converterFactoryType = ConverterFactoryType.GSON
             )

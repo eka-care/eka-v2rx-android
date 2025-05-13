@@ -52,10 +52,7 @@ internal object Voice2RxInternalUtils {
     fun getUserTokenData(sessionToken: String): UserTokenData? {
         try {
             val userData =
-                String(
-                    Base64.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL)
-                        .decode(sessionToken.split(".")[1]), StandardCharsets.UTF_8
-                )
+                String(Base64.decode(sessionToken.split(".")[1]), StandardCharsets.UTF_8)
             val userTokenData = Gson().fromJson(userData, UserTokenData::class.java)
             VoiceLogger.d("getUserTokenData", userTokenData.toString())
             return userTokenData

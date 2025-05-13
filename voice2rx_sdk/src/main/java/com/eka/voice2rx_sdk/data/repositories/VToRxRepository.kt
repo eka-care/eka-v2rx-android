@@ -49,7 +49,6 @@ internal class VToRxRepository(
     private val remoteDataSource: Voice2RxService =
         Networking.create(
             clazz = Voice2RxService::class.java,
-            curlLoggingEnabled = true,
             baseUrl = BuildConfig.DEVELOPER_URL,
             converterFactoryType = ConverterFactoryType.GSON
         )
