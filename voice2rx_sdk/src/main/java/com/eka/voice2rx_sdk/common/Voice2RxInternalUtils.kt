@@ -49,11 +49,11 @@ internal object Voice2RxInternalUtils {
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    fun getUserTokenData(sessionToken: String): UserTokenData? {
+    fun getUserTokenData(sessionToken: String): VoiceUserData? {
         try {
             val userData =
                 String(Base64.decode(sessionToken.split(".")[1]), StandardCharsets.UTF_8)
-            val userTokenData = Gson().fromJson(userData, UserTokenData::class.java)
+            val userTokenData = Gson().fromJson(userData, VoiceUserData::class.java)
             VoiceLogger.d("getUserTokenData", userTokenData.toString())
             return userTokenData
         } catch (e: Exception) {
@@ -65,47 +65,16 @@ internal object Voice2RxInternalUtils {
 
 
 @Keep
-internal data class UserTokenData(
+internal data class VoiceUserData(
     @SerializedName("uuid")
     val uuid: String?,
     @SerializedName("oid")
     val oid: String,
     @SerializedName("fn")
     val name: String?,
-    @SerializedName("gen")
-    val gender: String?,
-    @SerializedName("s")
-    val salutation: String?,
-    @SerializedName("is-p")
-    val isP: Boolean?,
-    @SerializedName("is-d")
-    val isD: Boolean?,
-    @SerializedName("dob")
-    val dob: String?,
     @SerializedName("mob")
     val mob: String?,
-    @SerializedName("type")
-    val type: Int?,
-    @SerializedName("doc-id")
     val docId: String?,
     @SerializedName("b-id")
     val businessId: String?,
-    @SerializedName("p")
-    val passType: String?,
-    @SerializedName("pp")
-    val passDetails: PassDetails?,
-    @SerializedName("exp")
-    val exp: Int?,
-    @SerializedName("iat")
-    val iat: Int?,
-)
-
-@Keep
-internal data class PassDetails(
-    @SerializedName("c")
-    val c: String,
-    @SerializedName("e")
-    val e: String,
-    @SerializedName("t")
-    val t: String,
 )
