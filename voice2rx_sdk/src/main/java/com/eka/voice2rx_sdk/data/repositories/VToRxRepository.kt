@@ -634,7 +634,7 @@ internal class VToRxRepository(
                 return@launch
             }
             if (session?.uploadStage == VoiceTransactionStage.COMPLETED) {
-                onResponse(ResponseState.Error("Session already completed!"))
+                onResponse(ResponseState.Success(true))
                 return@launch
             }
             val sessionFiles = getAllFiles(sessionId = sessionId)
