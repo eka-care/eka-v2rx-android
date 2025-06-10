@@ -13,8 +13,7 @@ class OkHttpImpl(
         val headers = HashMap<String, String>()
         headers.putAll(defaultHeaders)
         headers["Authorization"] = "Bearer $authorizationToken"
-        headers["flavour"] =
-            "android_${BuildConfig.SDK_VERSION_NAME}_${BuildConfig.SDK_BUILD_NUMBER}"
+        headers["v2rx_sdk_version"] = BuildConfig.SDK_VERSION_NAME
         return headers
     }
 
