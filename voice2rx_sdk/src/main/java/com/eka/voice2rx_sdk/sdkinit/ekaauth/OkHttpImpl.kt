@@ -2,6 +2,7 @@ package com.eka.voice2rx_sdk.sdkinit.ekaauth
 
 import com.eka.voice2rx_sdk.BuildConfig
 import com.eka.voice2rx_sdk.networking.IOkHttpSetup
+import com.eka.voice2rx_sdk.sdkinit.Voice2Rx
 import kotlinx.coroutines.runBlocking
 
 class OkHttpImpl(
@@ -12,7 +13,8 @@ class OkHttpImpl(
     override fun getDefaultHeaders(url: String): Map<String, String> {
         val headers = HashMap<String, String>()
         headers.putAll(defaultHeaders)
-        headers["Authorization"] = "Bearer $authorizationToken"
+        headers["Authorization"] =
+            "Bearer ${Voice2Rx.getVoice2RxInitConfiguration().authorizationToken}"
         headers["v2rx_sdk_version"] = BuildConfig.SDK_VERSION_NAME
         return headers
     }
