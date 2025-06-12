@@ -15,7 +15,7 @@ class OkHttpImpl(
         headers.putAll(defaultHeaders)
         headers["Authorization"] =
             "Bearer ${Voice2Rx.getVoice2RxInitConfiguration().authorizationToken}"
-        headers["v2rx_sdk_version"] = BuildConfig.SDK_VERSION_NAME
+        headers["sdk_version"] = BuildConfig.SDK_VERSION_NAME
         return headers
     }
 
